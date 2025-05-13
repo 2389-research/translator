@@ -10,6 +10,7 @@ dependencies = [
     "rich>=13.9.4",
     "tiktoken>=0.7.0",
     "pycountry>=23.12.10",
+    "python-frontmatter>=1.1.0",
     "swarm",
 ]
 

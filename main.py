@@ -6,10 +6,10 @@ import argparse
 import os
 import re
 import sys
-import yaml
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
+import frontmatter
 import openai
 import pycountry
 import tiktoken
@@ -182,6 +182,109 @@ def write_file(file_path: str, content: str) -> None:
         console.print(f"[bold red]Error:[/] Failed to write file: {escape(str(e))}")
         sys.exit(1)
 
+def parse_frontmatter(content: str) -> Tuple[bool, Optional[Dict], Optional[str]]:
+    """Parse frontmatter from content using python-frontmatter.
+    
+    Returns:
+        Tuple containing:
+            - Boolean indicating if frontmatter was detected
+            - Dictionary containing the frontmatter data if found, otherwise None
+            - String containing the content without frontmatter if found, otherwise None
+    """
+    try:
+        # Parse content with frontmatter
+        post = frontmatter.loads(content)
+        
+        # Check if frontmatter was found
+        if post.metadata:
+            # Extract metadata and content
+            metadata = dict(post.metadata)
+            content_without_frontmatter = post.content
+            return True, metadata, content_without_frontmatter
+        else:
+            # No frontmatter found
+            return False, None, None
+    except Exception as e:
+        console.print(f"[bold yellow]Warning:[/] Failed to parse frontmatter: {escape(str(e))}")
+        return False, None, None
+
+def get_translatable_frontmatter_fields(frontmatter: Dict) -> List[str]:
+    """Get a list of frontmatter fields that should be translated."""
+    # Common translatable fields in various static site generators
+    translatable_fields = [
+        'title', 'description', 'summary', 'excerpt', 'subtitle',
+        'seo_title', 'seo_description', 'meta_description',
+        'abstract', 'intro', 'heading', 'subheading'
+    ]
+    
+    # Return only fields that exist in the frontmatter
+    return [field for field in translatable_fields if field in frontmatter]
+
+def reconstruct_with_frontmatter(metadata: Dict, content: str) -> str:
+    """Reconstruct content with frontmatter using python-frontmatter."""
+    # Create a new post object with metadata and content
+    post = frontmatter.Post(content, **metadata)
+    
+    # Return the serialized post
+    return frontmatter.dumps(post)
+
+def translate_frontmatter(client: openai.OpenAI, frontmatter: Dict, fields: List[str], 
+                     target_language: str, model: str) -> Tuple[Dict, Dict]:
+    """Translate specified fields in frontmatter.
+    
+    Returns:
+        Tuple containing translated frontmatter and usage information
+    """
+    # Create a copy to avoid modifying the original
+    translated_frontmatter = frontmatter.copy()
+    
+    if not fields:
+        return translated_frontmatter, {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+    
+    # Prepare text for translation
+    fields_text = ""
+    for field in fields:
+        fields_text += f"{field}: {frontmatter[field]}\n\n"
+    
+    system_prompt = f"""You are a professional translator. Translate the following frontmatter fields to {target_language}.
+Each field is in the format "field_name: content". Translate ONLY the content, not the field names.
+Return the translated content in the exact same format, preserving all field names."""
+    
+    try:
+        console.print(f"[bold]Translating frontmatter fields:[/] {', '.join(fields)}")
+        
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": fields_text}
+            ],
+        )
+        
+        # Extract usage statistics
+        usage = {
+            "prompt_tokens": response.usage.prompt_tokens,
+            "completion_tokens": response.usage.completion_tokens,
+            "total_tokens": response.usage.total_tokens
+        }
+        
+        # Parse the response to get translated fields
+        translated_text = response.choices[0].message.content
+        
+        # Extract each translated field from the response
+        for field in fields:
+            pattern = rf"{field}: (.*?)(?:\n\n|\n$|$)"
+            match = re.search(pattern, translated_text, re.DOTALL)
+            if match:
+                translated_value = match.group(1).strip()
+                translated_frontmatter[field] = translated_value
+        
+        return translated_frontmatter, usage
+    except Exception as e:
+        console.print(f"[bold yellow]Warning:[/] Failed to translate frontmatter: {escape(str(e))}")
+        # Return original frontmatter on error
+        return frontmatter, {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+
 def translate_text(client: openai.OpenAI, text: str, target_language: str, model: str) -> Tuple[str, Dict]:
     """Translate text to the target language using OpenAI.
     
@@ -189,7 +292,13 @@ def translate_text(client: openai.OpenAI, text: str, target_language: str, model
         Tuple containing translated text and usage information
     """
     
-    system_prompt = f"You are a professional translator. Translate the following text to {target_language}. Preserve all formatting, markdown, and structure of the original text."
+    system_prompt = f"""
+    1. Read the provided text carefully.
+    2. Preserve all formatting, markdown, and structure exactly as they appear.
+    3. Identify any block quotes and code blocks.
+    4. Do not translate text in block quotes or in code blocks (including text within code blocks).
+    5. Translate everything else into {target_language}.
+    6. Output the translated text, ensuring that the formatting, markdown, and structure remain unchanged."""
     
     user_prompt = text
     
@@ -228,16 +337,16 @@ def edit_translation(client: openai.OpenAI, translated_text: str, original_text:
         Tuple containing edited text and usage information
     """
     
-    system_prompt = f"""You are a skilled bilingual editor specializing in {target_language}. 
-Your task is to review a translation and improve it by:
-1. Comparing with the original text to ensure accurate translation
-2. Fixing any grammatical errors
-3. Making the text sound natural and fluent in {target_language}
-4. Ensuring idioms and expressions are appropriate for {target_language} speakers
-5. Maintaining the original meaning, tone, and nuance
-6. Preserving all formatting, markdown, and structure
-
-Only make changes that improve the quality of the text in {target_language}."""
+    system_prompt = f"""
+    1. Carefully read the translated text alongside the original text in its entirety.
+    2. Compare both texts to ensure the translation accurately reflects the original meaning.
+    3. Correct any grammatical errors you find in the {target_language} text.
+    4. Adjust phrasing to make it sound natural and fluent for {target_language} speakers, making sure idioms and expressions are culturally appropriate.
+    5. Preserve the original tone, nuance, and style, including any formatting, markdown, and structure.
+    6. Avoid adding new information or altering the core meaning.
+    7. Ensure the final result doesn’t feel machine-translated but remains faithful to the source.
+    8. Make only changes that genuinely improve the text's quality in {target_language}.
+"""
     
     user_prompt = f"""# ORIGINAL TEXT
 {original_text}
@@ -431,8 +540,30 @@ def main():
     console.print(f"[bold]Reading file:[/] {escape(input_file)}")
     content = read_file(input_file)
     
+    # Variables to track frontmatter
+    has_frontmatter = False
+    frontmatter_data = None
+    content_without_frontmatter = None
+    frontmatter_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+    
+    # Check if file has frontmatter (for markdown blog posts)
+    if input_file.endswith(('.md', '.markdown', '.mdx')):
+        has_frontmatter, frontmatter_data, content_without_frontmatter = parse_frontmatter(content)
+        
+        if has_frontmatter:
+            console.print(f"[bold]Detected frontmatter:[/] static site generator metadata")
+            # Use content without frontmatter for token count
+            content_for_translation = content_without_frontmatter
+            frontmatter_str = frontmatter.dumps(frontmatter.Post("", **frontmatter_data)).split('---\n\n')[0]
+            frontmatter_token_count = count_tokens(frontmatter_str, model)
+            console.print(f"[bold]Frontmatter size:[/] {frontmatter_token_count:,} tokens")
+        else:
+            content_for_translation = content
+    else:
+        content_for_translation = content
+    
     # Check token limits
-    within_limits, token_count = check_token_limits(content, model)
+    within_limits, token_count = check_token_limits(content_for_translation, model)
     cost, cost_str = estimate_cost(token_count, model, not skip_edit)
     
     # Display token and cost information
@@ -460,8 +591,26 @@ def main():
         "total_tokens": 0
     }
     
-    # Perform translation and get token usage
-    translated_content, translation_usage = translate_text(client, content, target_language, model)
+    # Translate frontmatter if present
+    translated_frontmatter = None
+    if has_frontmatter:
+        # Get fields to translate
+        translatable_fields = get_translatable_frontmatter_fields(frontmatter_data)
+        if translatable_fields:
+            # Translate frontmatter fields
+            translated_frontmatter, frontmatter_usage = translate_frontmatter(
+                client, frontmatter_data, translatable_fields, target_language, model
+            )
+            
+            # Add to total usage
+            total_usage["prompt_tokens"] += frontmatter_usage["prompt_tokens"]
+            total_usage["completion_tokens"] += frontmatter_usage["completion_tokens"]
+            total_usage["total_tokens"] += frontmatter_usage["total_tokens"]
+        else:
+            translated_frontmatter = frontmatter_data
+    
+    # Perform translation of main content and get token usage
+    translated_content, translation_usage = translate_text(client, content_for_translation, target_language, model)
     total_usage["prompt_tokens"] += translation_usage["prompt_tokens"]
     total_usage["completion_tokens"] += translation_usage["completion_tokens"]
     total_usage["total_tokens"] += translation_usage["total_tokens"]
@@ -469,17 +618,23 @@ def main():
     # Perform editing if not skipped
     if not skip_edit:
         console.print(f"[bold]Editing translation for fluency and accuracy...[/]")
-        translated_content, edit_usage = edit_translation(client, translated_content, content, target_language, model)
+        translated_content, edit_usage = edit_translation(client, translated_content, content_for_translation, target_language, model)
         total_usage["prompt_tokens"] += edit_usage["prompt_tokens"]
         total_usage["completion_tokens"] += edit_usage["completion_tokens"]
         total_usage["total_tokens"] += edit_usage["total_tokens"]
+    
+    # Reconstruct content with translated frontmatter if needed
+    if has_frontmatter and translated_frontmatter:
+        final_content = reconstruct_with_frontmatter(translated_frontmatter, translated_content)
+    else:
+        final_content = translated_content
     
     # Calculate actual cost based on token usage
     actual_cost, cost_str = calculate_actual_cost(total_usage, model)
     
     # Write output file
     output_path = get_output_filename(input_file, target_language, output_file)
-    write_file(output_path, translated_content)
+    write_file(output_path, final_content)
     
     # Get the language code used for the filename
     language_code = Path(output_path).stem.split('.')[-1]
@@ -496,20 +651,33 @@ def main():
     usage_table.add_column("Output Tokens", style="green", justify="right")
     usage_table.add_column("Total Tokens", style="green", justify="right")
     
+    # Add frontmatter translation row if it happened
+    if has_frontmatter and frontmatter_usage["total_tokens"] > 0:
+        usage_table.add_row(
+            "Frontmatter", 
+            f"{frontmatter_usage['prompt_tokens']:,}",
+            f"{frontmatter_usage['completion_tokens']:,}",
+            f"{frontmatter_usage['total_tokens']:,}"
+        )
+    
+    # Add content translation row
+    usage_table.add_row(
+        "Content Translation", 
+        f"{translation_usage['prompt_tokens']:,}",
+        f"{translation_usage['completion_tokens']:,}",
+        f"{translation_usage['total_tokens']:,}"
+    )
+    
+    # Add editing row if not skipped
     if not skip_edit:
         usage_table.add_row(
-            "Translation", 
-            f"{translation_usage['prompt_tokens']:,}",
-            f"{translation_usage['completion_tokens']:,}",
-            f"{translation_usage['total_tokens']:,}"
-        )
-        usage_table.add_row(
-            "Editing", 
+            "Content Editing", 
             f"{edit_usage['prompt_tokens']:,}",
             f"{edit_usage['completion_tokens']:,}",
             f"{edit_usage['total_tokens']:,}"
         )
     
+    # Add total row
     usage_table.add_row(
         "Total", 
         f"{total_usage['prompt_tokens']:,}",

@@ -6,6 +6,7 @@ A simple command-line tool to translate text files to different languages using 
 
 - Translate text files (`.txt`, `.md`, etc.) to any language
 - Two-step process: translation followed by expert editing for natural results
+- Special handling for markdown blog posts with YAML frontmatter (Jekyll, Hugo, etc.)
 - Preserves original formatting and markdown structure
 - Automatically generates output filenames with ISO language codes
 - Configurable OpenAI model selection
@@ -58,8 +59,10 @@ uv run main.py large_document.txt Portuguese --estimate-only
 
 ## How It Works
 
-1. **Translation**: First, the text is translated to the target language while preserving formatting
-2. **Editing** (optional): A second pass is made with both the original and translated text to:
+1. **Frontmatter Detection**: For markdown files, detects and parses frontmatter using python-frontmatter (supports YAML format)
+2. **Frontmatter Translation**: Translates metadata fields like title, description, and summary
+3. **Content Translation**: Translates the main content to the target language while preserving formatting
+4. **Content Editing** (optional): A second pass is made with both the original and translated text to:
    - Compare with the original to ensure accurate translation
    - Fix grammatical errors
    - Make text sound natural to native speakers
