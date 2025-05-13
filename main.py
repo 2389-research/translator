@@ -293,12 +293,17 @@ def translate_text(client: openai.OpenAI, text: str, target_language: str, model
     """
     
     system_prompt = f"""
-    1. Read the provided text carefully.
-    2. Preserve all formatting, markdown, and structure exactly as they appear.
-    3. Identify any block quotes and code blocks.
-    4. Do not translate text in block quotes or in code blocks (including text within code blocks).
-    5. Translate everything else into {target_language}.
-    6. Output the translated text, ensuring that the formatting, markdown, and structure remain unchanged."""
+    1. Read the provided text carefully, preserving all formatting, markdown, and structure exactly as they appear.
+    2. Identify any block quotes and code blocks.
+    3. Do not translate text in block quotes or in code blocks (including text within code blocks).
+    4. Translate everything else into {target_language}.
+    5. Maintain the original formatting, markdown, and structure in your output.
+    6. Provide a natural-sounding translation rather than a word-for-word one.
+    7. For idioms, colloquialisms, or slang, render them in an equivalent, natural way in {target_language} whenever possible.
+    8. If there isn’t a direct or natural translation for a particular term or phrase, keep it in the original language and surround it with quotes if necessary.
+    9. Ensure that technical terms or jargon remain accurate; if there’s no suitable translation, keep the original term.
+    10. Strive for fluid, native-sounding prose that retains the tone and intent of the original text.
+    """
     
     user_prompt = text
     
@@ -346,6 +351,10 @@ def edit_translation(client: openai.OpenAI, translated_text: str, original_text:
     6. Avoid adding new information or altering the core meaning.
     7. Ensure the final result doesn’t feel machine-translated but remains faithful to the source.
     8. Make only changes that genuinely improve the text's quality in {target_language}.
+    7. Don't be too literal. If there isn't a direct translation, provide a natural-sounding translation.
+    9. If the text contains idioms or colloquialisms, translate them into the target language while maintaining their original meaning.
+    10. If the text contains technical terms or jargon, ensure that the translation is accurate and appropriate for the target audience, if there isn't a natural translation, keep it in the original language.
+    11. If there is not natural translation, keep it in the original language.
 """
     
     user_prompt = f"""# ORIGINAL TEXT
@@ -371,6 +380,7 @@ Return ONLY the improved translated text without explanations or comments."""
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
+                top_p=1.0
             )
             
             # Extract usage statistics
