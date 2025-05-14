@@ -161,7 +161,7 @@ class TranslatorCLI:
         parser.add_argument("-o", "--output", help="Output file path (optional)")
         parser.add_argument("-m", "--model", default="o3", help="OpenAI model to use (default: o3)")
         parser.add_argument("--no-edit", action="store_true", help="Skip the editing step (faster but may reduce quality)")
-        parser.add_argument("--critique", action="store_true", help="Add an aggressive critique step after editing (improves quality but increases cost)")
+        parser.add_argument("--no-critique", action="store_true", help="Skip the aggressive critique step (faster but may reduce quality)")
         parser.add_argument("--list-models", action="store_true", help="Display available models and pricing")
         parser.add_argument("--estimate-only", action="store_true", help="Only estimate tokens and cost, don't translate")
         
@@ -182,7 +182,7 @@ class TranslatorCLI:
         output_file = args.output
         model = args.model
         skip_edit = args.no_edit
-        do_critique = args.critique
+        do_critique = not args.no_critique  # Critique is enabled by default
         estimate_only = args.estimate_only
         
         if not Path(input_file).exists():
@@ -328,10 +328,28 @@ class TranslatorCLI:
         from translator.language import LanguageHandler
         language_code = LanguageHandler.get_language_code(target_language)
         
+        # Write translation log to a file
+        log_path = FileHandler.get_log_filename(output_path)
+        log_data = {
+            "input_file": input_file,
+            "output_file": output_path,
+            "target_language": target_language,
+            "language_code": language_code,
+            "model": model,
+            "skip_edit": skip_edit,
+            "do_critique": do_critique,
+            "has_frontmatter": has_frontmatter,
+            "token_usage": total_usage,
+            "cost": cost_str,
+            "prompts_and_responses": translator.translation_log
+        }
+        FileHandler.write_log(log_path, log_data)
+        
         # Display completion message with token usage and cost
         console.print(f"[bold green]✓[/] Translation complete!")
         console.print(f"[bold]Target language:[/] {escape(target_language)} ({language_code})")
         console.print(f"[bold]Output file:[/] {escape(output_path)}")
+        console.print(f"[bold]Log file:[/] {escape(log_path)}")
         
         # Display token usage table
         cls.display_usage_table(

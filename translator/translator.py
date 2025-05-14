@@ -24,6 +24,13 @@ class Translator:
             client: OpenAI client instance
         """
         self.client = client
+        self.translation_log = {
+            "translation": {},
+            "editing": {},
+            "critique": {},
+            "feedback": {},
+            "frontmatter": {}
+        }
 
     def translate_text(self, text: str, target_language: str, model: str) -> Tuple[str, Dict]:
         """Translate text to the target language using OpenAI.
@@ -79,6 +86,16 @@ class Translator:
                     "total_tokens": response.usage.total_tokens
                 }
                 
+                # Log the translation prompts and response
+                self.translation_log["translation"] = {
+                    "model": model,
+                    "target_language": target_language,
+                    "system_prompt": system_prompt,
+                    "user_prompt": user_prompt,
+                    "response": response.choices[0].message.content,
+                    "usage": usage
+                }
+                
                 return response.choices[0].message.content, usage
         except Exception as e:
             console.print(f"[bold red]Error:[/] Translation failed: {escape(str(e))}")
@@ -130,20 +147,36 @@ Return ONLY the improved translated text without explanations or comments."""
             ) as progress:
                 progress.add_task("editing", total=None)
                 
-                response = self.client.chat.completions.create(
-                    model=model,
-                    messages=[
+                # Create parameters for API call
+                params = {
+                    "model": model,
+                    "messages": [
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt}
-                    ],
-                    top_p=1.0
-                )
+                    ]
+                }
+                
+                # Add top_p for models that support it
+                if model != "o3":
+                    params["top_p"] = 1.0
+                    
+                response = self.client.chat.completions.create(**params)
                 
                 # Extract usage statistics
                 usage = {
                     "prompt_tokens": response.usage.prompt_tokens,
                     "completion_tokens": response.usage.completion_tokens,
                     "total_tokens": response.usage.total_tokens
+                }
+                
+                # Log the editing prompts and response
+                self.translation_log["editing"] = {
+                    "model": model,
+                    "target_language": target_language,
+                    "system_prompt": system_prompt,
+                    "user_prompt": user_prompt,
+                    "response": response.choices[0].message.content,
+                    "usage": usage
                 }
                 
                 return response.choices[0].message.content, usage
@@ -203,14 +236,20 @@ Include specific suggestions for how to fix each issue."""
             ) as progress:
                 progress.add_task("critiquing", total=None)
                 
-                response = self.client.chat.completions.create(
-                    model=model,
-                    messages=[
+                # Create parameters without temperature for o3 model
+                params = {
+                    "model": model,
+                    "messages": [
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt}
-                    ],
-                    temperature=0.7
-                )
+                    ]
+                }
+                
+                # Add temperature for models other than o3
+                if model != "o3":
+                    params["temperature"] = 0.7
+                    
+                response = self.client.chat.completions.create(**params)
                 
                 # Extract usage statistics
                 usage = {
@@ -220,6 +259,16 @@ Include specific suggestions for how to fix each issue."""
                 }
                 
                 critique_feedback = response.choices[0].message.content
+                
+                # Log the critique prompts and response
+                self.translation_log["critique"] = {
+                    "model": model,
+                    "target_language": target_language,
+                    "system_prompt": system_prompt,
+                    "user_prompt": user_prompt,
+                    "response": critique_feedback,
+                    "usage": usage
+                }
                 
                 return translated_text, usage, critique_feedback
         except Exception as e:
@@ -275,20 +324,36 @@ Return ONLY the improved translated text without explanations or comments."""
             ) as progress:
                 progress.add_task("applying_feedback", total=None)
                 
-                response = self.client.chat.completions.create(
-                    model=model,
-                    messages=[
+                # Create parameters without temperature for o3 model
+                params = {
+                    "model": model,
+                    "messages": [
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt}
-                    ],
-                    temperature=0.5
-                )
+                    ]
+                }
+                
+                # Add temperature for models other than o3
+                if model != "o3":
+                    params["temperature"] = 0.5
+                    
+                response = self.client.chat.completions.create(**params)
                 
                 # Extract usage statistics
                 usage = {
                     "prompt_tokens": response.usage.prompt_tokens,
                     "completion_tokens": response.usage.completion_tokens,
                     "total_tokens": response.usage.total_tokens
+                }
+                
+                # Log the feedback application prompts and response
+                self.translation_log["feedback"] = {
+                    "model": model,
+                    "target_language": target_language,
+                    "system_prompt": system_prompt,
+                    "user_prompt": user_prompt,
+                    "response": response.choices[0].message.content,
+                    "usage": usage
                 }
                 
                 return response.choices[0].message.content, usage
@@ -346,6 +411,17 @@ Return the translated content in the exact same format, preserving all field nam
             
             # Parse the response to get translated fields
             translated_text = response.choices[0].message.content
+            
+            # Log the frontmatter translation prompts and response
+            self.translation_log["frontmatter"] = {
+                "model": model,
+                "target_language": target_language,
+                "system_prompt": system_prompt,
+                "user_prompt": fields_text,
+                "response": translated_text,
+                "usage": usage,
+                "fields": fields
+            }
             
             # Extract each translated field from the response
             for field in fields:

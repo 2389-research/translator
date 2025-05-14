@@ -56,6 +56,33 @@ class FileHandler:
             sys.exit(1)
 
     @staticmethod
+    def write_log(log_path: str, log_data: dict) -> None:
+        """Write detailed translation log to a file.
+        
+        Args:
+            log_path: The path to the log file
+            log_data: Dictionary containing the log data
+            
+        Raises:
+            SystemExit: If the log file cannot be written
+        """
+        try:
+            import json
+            from datetime import datetime
+            
+            # Add timestamp to the log
+            log_data["timestamp"] = datetime.now().isoformat()
+            
+            # Format the log content
+            log_content = json.dumps(log_data, indent=2, ensure_ascii=False)
+            
+            with open(log_path, 'w', encoding='utf-8') as file:
+                file.write(log_content)
+        except Exception as e:
+            console.print(f"[bold yellow]Warning:[/] Failed to write log file: {escape(str(e))}")
+            # Don't exit on log failure, just warn
+
+    @staticmethod
     def get_output_filename(input_file: str, target_language: str, output_file: Optional[str] = None) -> str:
         """Generate output filename if not provided.
         
@@ -80,3 +107,16 @@ class FileHandler:
         
         # Create a new path in the same directory as the input file
         return str(parent_dir / f"{stem}.{language_code}{suffix}")
+        
+    @staticmethod
+    def get_log_filename(output_file: str) -> str:
+        """Generate log filename based on the output file.
+        
+        Args:
+            output_file: The path to the output file
+            
+        Returns:
+            The path to the log file
+        """
+        output_path = Path(output_file)
+        return str(output_path.with_suffix(f"{output_path.suffix}.log"))

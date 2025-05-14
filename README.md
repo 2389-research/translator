@@ -5,11 +5,15 @@ A simple command-line tool to translate text files to different languages using 
 ## Features
 
 - Translate text files (`.txt`, `.md`, etc.) to any language
-- Two-step process: translation followed by expert editing for natural results
+- Three-step process by default:
+  - Initial translation preserving structure and formatting
+  - Expert editing for natural-sounding language
+  - Aggressive critique and revision for highest quality results
 - Special handling for markdown blog posts with YAML frontmatter (Jekyll, Hugo, etc.)
 - Preserves original formatting and markdown structure
 - Automatically generates output filenames with ISO language codes
 - Configurable OpenAI model selection
+- Detailed translation logs with all prompts and responses
 
 ## Installation
 
@@ -41,7 +45,7 @@ This will translate `input.txt` to Spanish and save it as `input.es.txt`.
 - `-o, --output`: Specify custom output file
 - `-m, --model`: Choose OpenAI model (default: o3)
 - `--no-edit`: Skip the editing step (faster but may reduce quality)
-- `--critique`: Add an aggressive critique step for highest quality (increases cost)
+- `--no-critique`: Skip the aggressive critique step (faster but may reduce quality)
 - `--list-models`: Display available models and their pricing
 - `--estimate-only`: Estimate token usage and cost without translating
 
@@ -57,8 +61,8 @@ translate document.txt Japanese -m gpt-4o
 # Skip the editing step for faster processing
 translate long_document.txt German --no-edit
 
-# Use aggressive critique for highest quality translation
-translate important_document.txt Chinese --critique
+# Skip the critique step for faster processing
+translate quick_translation.txt Chinese --no-critique
 
 # See available models and pricing
 translate --list-models
@@ -88,6 +92,10 @@ translate large_document.txt Portuguese --estimate-only
      • Addresses all identified issues with precision
      • Implements specific suggestions for improvement
      • Refines the translation to read as if originally written in the target language
+6. **Log Generation**: Creates a detailed log file with all translation steps:
+   - Saved as a JSON file next to the translated file (filename.language.ext.log)
+   - Contains all prompts, responses, and metadata from each step of the process
+   - Useful for debugging, improving prompts, or learning from the translation
 
 ## Supported Languages
 
