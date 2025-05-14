@@ -11,7 +11,8 @@ class CostEstimator:
     """Cost estimation and calculation for OpenAI API usage."""
 
     @staticmethod
-    def estimate_cost(token_count: int, model: str, with_edit: bool = True, with_critique: bool = False) -> Tuple[float, str]:
+    def estimate_cost(token_count: int, model: str, with_edit: bool = True, 
+                     with_critique: bool = False, critique_loops: int = 1) -> Tuple[float, str]:
         """Estimate the cost of translation based on token count and model.
         
         Args:
@@ -19,6 +20,7 @@ class CostEstimator:
             model: The model name to use for translation
             with_edit: Whether to include editing step in estimate
             with_critique: Whether to include critique step in estimate
+            critique_loops: Number of critique-revision loops to perform
             
         Returns:
             Tuple containing:
@@ -54,24 +56,27 @@ class CostEstimator:
             )
         
         # If critique is enabled, add its cost (both critique generation and application)
-        if with_critique:
-            # 1. For the critique generation, we input both original and translated text
-            critique_input_tokens = token_count * 2
-            # Critique output is typically longer than the translation (detailed feedback)
-            critique_output_tokens = token_count * 1.5
-            
-            # 2. For applying critique feedback, we input original, translation, and critique
-            feedback_input_tokens = token_count * 3.5  # original + translation + critique feedback
-            # Output is similar to the translation
-            feedback_output_tokens = token_count
-            
-            # Add critique generation and application costs
-            cost += (
-                (critique_input_tokens / 1000) * input_cost +
-                (critique_output_tokens / 1000) * output_cost +
-                (feedback_input_tokens / 1000) * input_cost +
-                (feedback_output_tokens / 1000) * output_cost
-            )
+        if with_critique and critique_loops > 0:
+            for _ in range(critique_loops):
+                # Each critique loop includes:
+                
+                # 1. For the critique generation, we input both original and translated text
+                critique_input_tokens = token_count * 2
+                # Critique output is typically longer than the translation (detailed feedback)
+                critique_output_tokens = token_count * 1.5
+                
+                # 2. For applying critique feedback, we input original, translation, and critique
+                feedback_input_tokens = token_count * 3.5  # original + translation + critique feedback
+                # Output is similar to the translation
+                feedback_output_tokens = token_count
+                
+                # Add critique generation and application costs for this loop
+                cost += (
+                    (critique_input_tokens / 1000) * input_cost +
+                    (critique_output_tokens / 1000) * output_cost +
+                    (feedback_input_tokens / 1000) * input_cost +
+                    (feedback_output_tokens / 1000) * output_cost
+                )
         
         # Format approximate price
         if cost < 0.01:

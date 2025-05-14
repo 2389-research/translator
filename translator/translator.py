@@ -29,7 +29,8 @@ class Translator:
             "editing": {},
             "critique": {},
             "feedback": {},
-            "frontmatter": {}
+            "frontmatter": {},
+            "all_critiques": []
         }
 
     def translate_text(self, text: str, target_language: str, model: str) -> Tuple[str, Dict]:

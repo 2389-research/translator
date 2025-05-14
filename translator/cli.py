@@ -6,7 +6,7 @@ import argparse
 import os
 import sys
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import frontmatter
 import openai
@@ -72,9 +72,12 @@ class TranslatorCLI:
                           frontmatter_usage: Optional[Dict[str, int]] = None,
                           critique_usage: Optional[Dict[str, int]] = None,
                           feedback_usage: Optional[Dict[str, int]] = None,
+                          critique_usages: Optional[List[Dict[str, int]]] = None,
+                          feedback_usages: Optional[List[Dict[str, int]]] = None,
                           has_frontmatter: bool = False,
                           skip_edit: bool = False, 
-                          do_critique: bool = False) -> None:
+                          do_critique: bool = False,
+                          critique_loops: int = 1) -> None:
         """Display token usage table.
         
         Args:
@@ -84,9 +87,12 @@ class TranslatorCLI:
             frontmatter_usage: Token usage for frontmatter translation (optional)
             critique_usage: Token usage for critique generation (optional)
             feedback_usage: Token usage for applying critique feedback (optional)
+            critique_usages: List of token usages for multiple critique loops (optional)
+            feedback_usages: List of token usages for multiple feedback loops (optional)
             has_frontmatter: Whether frontmatter was translated
             skip_edit: Whether editing was skipped
             do_critique: Whether critique was performed
+            critique_loops: Number of critique loops performed
         """
         usage_table = Table(title="Token Usage")
         usage_table.add_column("Operation", style="cyan")
@@ -122,20 +128,38 @@ class TranslatorCLI:
         
         # Add critique and feedback rows if performed
         if do_critique:
-            if critique_usage and critique_usage["total_tokens"] > 0:
+            # If we have multiple critique loops, show each one
+            if critique_usages and feedback_usages and len(critique_usages) > 0:
+                for i, (crit_usage, feed_usage) in enumerate(zip(critique_usages, feedback_usages)):
+                    if crit_usage and crit_usage["total_tokens"] > 0:
+                        usage_table.add_row(
+                            f"Critique Generation (Loop {i+1})", 
+                            f"{crit_usage['prompt_tokens']:,}",
+                            f"{crit_usage['completion_tokens']:,}",
+                            f"{crit_usage['total_tokens']:,}"
+                        )
+                    if feed_usage and feed_usage["total_tokens"] > 0:
+                        usage_table.add_row(
+                            f"Critique Application (Loop {i+1})", 
+                            f"{feed_usage['prompt_tokens']:,}",
+                            f"{feed_usage['completion_tokens']:,}",
+                            f"{feed_usage['total_tokens']:,}"
+                        )
+            # Fallback to original behavior for backward compatibility
+            elif critique_usage and critique_usage["total_tokens"] > 0:
                 usage_table.add_row(
                     "Critique Generation", 
                     f"{critique_usage['prompt_tokens']:,}",
                     f"{critique_usage['completion_tokens']:,}",
                     f"{critique_usage['total_tokens']:,}"
                 )
-            if feedback_usage and feedback_usage["total_tokens"] > 0:
-                usage_table.add_row(
-                    "Critique Application", 
-                    f"{feedback_usage['prompt_tokens']:,}",
-                    f"{feedback_usage['completion_tokens']:,}",
-                    f"{feedback_usage['total_tokens']:,}"
-                )
+                if feedback_usage and feedback_usage["total_tokens"] > 0:
+                    usage_table.add_row(
+                        "Critique Application", 
+                        f"{feedback_usage['prompt_tokens']:,}",
+                        f"{feedback_usage['completion_tokens']:,}",
+                        f"{feedback_usage['total_tokens']:,}"
+                    )
         
         # Add total row
         usage_table.add_row(
@@ -162,6 +186,7 @@ class TranslatorCLI:
         parser.add_argument("-m", "--model", default="o3", help="OpenAI model to use (default: o3)")
         parser.add_argument("--no-edit", action="store_true", help="Skip the editing step (faster but may reduce quality)")
         parser.add_argument("--no-critique", action="store_true", help="Skip the aggressive critique step (faster but may reduce quality)")
+        parser.add_argument("--critique-loops", type=int, default=4, help="Number of critique-revision loops to perform (default: 4, max: 5)")
         parser.add_argument("--list-models", action="store_true", help="Display available models and pricing")
         parser.add_argument("--estimate-only", action="store_true", help="Only estimate tokens and cost, don't translate")
         
@@ -183,6 +208,9 @@ class TranslatorCLI:
         model = args.model
         skip_edit = args.no_edit
         do_critique = not args.no_critique  # Critique is enabled by default
+        critique_loops = args.critique_loops if do_critique else 0
+        # Limit critique loops to a reasonable number
+        critique_loops = min(max(critique_loops, 0), 5)
         estimate_only = args.estimate_only
         
         if not Path(input_file).exists():
@@ -219,7 +247,7 @@ class TranslatorCLI:
         
         # Check token limits
         within_limits, token_count = TokenCounter.check_token_limits(content_for_translation, model)
-        cost, cost_str = CostEstimator.estimate_cost(token_count, model, not skip_edit, do_critique)
+        cost, cost_str = CostEstimator.estimate_cost(token_count, model, not skip_edit, do_critique, critique_loops)
         
         # Display token and cost information
         console.print(f"[bold]File size:[/] {len(content):,} characters, {token_count:,} tokens")
@@ -279,37 +307,63 @@ class TranslatorCLI:
             total_usage["completion_tokens"] += edit_usage["completion_tokens"]
             total_usage["total_tokens"] += edit_usage["total_tokens"]
         
-        # Perform critique step if requested
+        # Perform critique loops if requested
         critique_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
         feedback_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
         
-        if do_critique:
-            # Generate critique
-            console.print(f"[bold]Generating critique of translation...[/]")
-            _, critique_usage, critique_feedback = translator.critique_translation(
-                translated_content, content_for_translation, target_language, model
-            )
-            total_usage["prompt_tokens"] += critique_usage["prompt_tokens"]
-            total_usage["completion_tokens"] += critique_usage["completion_tokens"]
-            total_usage["total_tokens"] += critique_usage["total_tokens"]
+        # Lists to track usage across multiple critique loops
+        critique_usages = []
+        feedback_usages = []
+        
+        if do_critique and critique_loops > 0:
+            # Store all critiques for logging
+            all_critiques = []
             
-            # Show critique summary
-            critique_lines = critique_feedback.split('\n')
-            preview_lines = 10  # Show first 10 lines as a preview
-            console.print("[bold yellow]Critique summary:[/]")
-            for i, line in enumerate(critique_lines[:preview_lines]):
-                console.print(f"  {line}")
-            if len(critique_lines) > preview_lines:
-                console.print(f"  [dim]...and {len(critique_lines) - preview_lines} more lines[/dim]")
+            for loop in range(critique_loops):
+                # Generate critique for the current version
+                console.print(f"[bold]Critique loop {loop+1}/{critique_loops}: Generating critique...[/]")
+                _, loop_critique_usage, critique_feedback = translator.critique_translation(
+                    translated_content, content_for_translation, target_language, model
+                )
+                
+                # Add usage to the running total
+                total_usage["prompt_tokens"] += loop_critique_usage["prompt_tokens"]
+                total_usage["completion_tokens"] += loop_critique_usage["completion_tokens"]
+                total_usage["total_tokens"] += loop_critique_usage["total_tokens"]
+                
+                # Store for reporting
+                critique_usages.append(loop_critique_usage)
+                all_critiques.append(critique_feedback)
+                
+                # Show critique summary
+                critique_lines = critique_feedback.split('\n')
+                preview_lines = 10  # Show first 10 lines as a preview
+                console.print(f"[bold yellow]Critique summary (loop {loop+1}):[/]")
+                for i, line in enumerate(critique_lines[:preview_lines]):
+                    console.print(f"  {line}")
+                if len(critique_lines) > preview_lines:
+                    console.print(f"  [dim]...and {len(critique_lines) - preview_lines} more lines[/dim]")
+                
+                # Apply critique feedback
+                console.print(f"[bold]Critique loop {loop+1}/{critique_loops}: Applying critique feedback...[/]")
+                translated_content, loop_feedback_usage = translator.apply_critique_feedback(
+                    translated_content, content_for_translation, critique_feedback, target_language, model
+                )
+                
+                # Add usage to the running total
+                total_usage["prompt_tokens"] += loop_feedback_usage["prompt_tokens"]
+                total_usage["completion_tokens"] += loop_feedback_usage["completion_tokens"]
+                total_usage["total_tokens"] += loop_feedback_usage["total_tokens"]
+                
+                # Store for reporting
+                feedback_usages.append(loop_feedback_usage)
             
-            # Apply critique feedback
-            console.print(f"[bold]Applying critique feedback to improve translation...[/]")
-            translated_content, feedback_usage = translator.apply_critique_feedback(
-                translated_content, content_for_translation, critique_feedback, target_language, model
-            )
-            total_usage["prompt_tokens"] += feedback_usage["prompt_tokens"]
-            total_usage["completion_tokens"] += feedback_usage["completion_tokens"]
-            total_usage["total_tokens"] += feedback_usage["total_tokens"]
+            # For compatibility with existing code, store the last loop's usage in the original variables
+            critique_usage = critique_usages[-1] if critique_usages else {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+            feedback_usage = feedback_usages[-1] if feedback_usages else {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+            
+            # Store all critiques in translator's log for logging
+            translator.translation_log["all_critiques"] = all_critiques
         
         # Reconstruct content with translated frontmatter if needed
         if has_frontmatter and translated_frontmatter:
@@ -338,10 +392,16 @@ class TranslatorCLI:
             "model": model,
             "skip_edit": skip_edit,
             "do_critique": do_critique,
+            "critique_loops": critique_loops,
             "has_frontmatter": has_frontmatter,
             "token_usage": total_usage,
             "cost": cost_str,
-            "prompts_and_responses": translator.translation_log
+            "prompts_and_responses": translator.translation_log,
+            # Include more detailed info for multiple critique loops
+            "critique_loop_details": {
+                "critique_usages": critique_usages if 'critique_usages' in locals() else [],
+                "feedback_usages": feedback_usages if 'feedback_usages' in locals() else []
+            }
         }
         FileHandler.write_log(log_path, log_data)
         
@@ -359,9 +419,12 @@ class TranslatorCLI:
             frontmatter_usage=frontmatter_usage,
             critique_usage=critique_usage,
             feedback_usage=feedback_usage,
+            critique_usages=critique_usages if 'critique_usages' in locals() else None,
+            feedback_usages=feedback_usages if 'feedback_usages' in locals() else None,
             has_frontmatter=has_frontmatter,
             skip_edit=skip_edit,
-            do_critique=do_critique
+            do_critique=do_critique,
+            critique_loops=critique_loops
         )
         
         console.print(f"[bold]Actual cost:[/] {cost_str}")

@@ -46,6 +46,7 @@ This will translate `input.txt` to Spanish and save it as `input.es.txt`.
 - `-m, --model`: Choose OpenAI model (default: o3)
 - `--no-edit`: Skip the editing step (faster but may reduce quality)
 - `--no-critique`: Skip the aggressive critique step (faster but may reduce quality)
+- `--critique-loops`: Number of critique-revision loops to perform (default: 4, max: 5)
 - `--list-models`: Display available models and their pricing
 - `--estimate-only`: Estimate token usage and cost without translating
 
@@ -63,6 +64,9 @@ translate long_document.txt German --no-edit
 
 # Skip the critique step for faster processing
 translate quick_translation.txt Chinese --no-critique
+
+# Use 4 critique loops for highest quality translation
+translate important_document.txt Korean --critique-loops 4
 
 # See available models and pricing
 translate --list-models
