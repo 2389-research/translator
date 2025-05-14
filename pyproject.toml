@@ -12,7 +12,14 @@ dependencies = [
     "pycountry>=23.12.10",
     "python-frontmatter>=1.1.0",
     "swarm",
+    "pytest>=7.4.0",
 ]
+
+[project.scripts]
+translate = "translator.cli:TranslatorCLI.run"
+
+[project.packages]
+find = {}
 
 [tool.uv.sources]
 swarm = { git = "https://github.com/openai/swarm.git" }
