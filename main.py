@@ -467,10 +467,12 @@ def get_output_filename(input_file: str, target_language: str, output_file: Opti
     language_code = get_language_code(target_language)
     
     input_path = Path(input_file)
+    parent_dir = input_path.parent
     stem = input_path.stem
     suffix = input_path.suffix
     
-    return f"{stem}.{language_code}{suffix}"
+    # Create a new path in the same directory as the input file
+    return str(parent_dir / f"{stem}.{language_code}{suffix}")
 
 def confirm(prompt: str) -> bool:
     """Ask for user confirmation."""
