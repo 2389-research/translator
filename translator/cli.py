@@ -247,7 +247,13 @@ class TranslatorCLI:
             content_for_translation = content
             
         # Check token limits
-        within_limits, token_count = TokenCounter.check_token_limits(content_for_translation, model)
+        within_limits, token_count = TokenCounter.check_token_limits(
+            content_for_translation, 
+            model, 
+            with_edit=not skip_edit, 
+            with_critique=do_critique, 
+            critique_loops=critique_loops
+        )
         cost, cost_str = CostEstimator.estimate_cost(token_count, model, not skip_edit, do_critique, critique_loops)
         
         # Display token and cost information
@@ -437,8 +443,16 @@ class TranslatorCLI:
         # Generate the narrative
         narrative = log_interpreter.generate_narrative(log_data, "o4-mini")
         
-        # Get the narrative filename
-        narrative_path = log_interpreter.get_narrative_filename(log_path)
+        # Get the narrative filename - format: filename.languagecode.log
+        base_parts = Path(output_path).stem.split('.')
+        if len(base_parts) >= 2:
+            # This handles the standard output format: filename.languagecode.ext
+            base = '.'.join(base_parts[:2])  # Take filename and language code
+        else:
+            # Fallback for custom output paths
+            base = Path(output_path).stem
+            
+        narrative_path = str(Path(output_path).parent / f"{base}.log")
         
         # Write the narrative to a file
         log_interpreter.write_narrative(narrative_path, narrative)
@@ -509,7 +523,13 @@ class TranslatorCLI:
             content_for_translation = content
             
         # Check token limits
-        within_limits, token_count = TokenCounter.check_token_limits(content_for_translation, model)
+        within_limits, token_count = TokenCounter.check_token_limits(
+            content_for_translation, 
+            model, 
+            with_edit=not skip_edit, 
+            with_critique=do_critique, 
+            critique_loops=critique_loops
+        )
         cost, cost_str = CostEstimator.estimate_cost(token_count, model, not skip_edit, do_critique, critique_loops)
         
         # Display token and cost information

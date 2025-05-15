@@ -31,21 +31,24 @@ class CostEstimator:
         input_cost = ModelConfig.get_input_cost(model)
         output_cost = ModelConfig.get_output_cost(model)
         
+        # Estimate system prompt sizes
+        system_prompt_tokens = 200  # Approximate size for system prompts
+        
         # Estimate input/output tokens
-        input_tokens = token_count
-        # Translation typically produces similar token count to original
-        output_tokens = token_count
+        # Base translation cost: system prompt + content + resulting translation
+        translation_input_tokens = system_prompt_tokens + token_count
+        translation_output_tokens = token_count  # Translation typically similar in length to original
         
         # Start with translation cost
         cost = (
-            (input_tokens / 1000) * input_cost +
-            (output_tokens / 1000) * output_cost
+            (translation_input_tokens / 1000) * input_cost +
+            (translation_output_tokens / 1000) * output_cost
         )
         
         # If editing is enabled, add its cost
         if with_edit:
-            # For the edit, we input both original and translated text
-            edit_input_tokens = token_count * 2
+            # For the edit, we input system prompt + original + translated text
+            edit_input_tokens = system_prompt_tokens + (token_count * 2)
             # Output is similar to the translation
             edit_output_tokens = token_count
             
@@ -60,13 +63,13 @@ class CostEstimator:
             for _ in range(critique_loops):
                 # Each critique loop includes:
                 
-                # 1. For the critique generation, we input both original and translated text
-                critique_input_tokens = token_count * 2
+                # 1. For the critique generation, we input system prompt + original + translated text
+                critique_input_tokens = system_prompt_tokens + (token_count * 2)
                 # Critique output is typically longer than the translation (detailed feedback)
-                critique_output_tokens = token_count * 1.5
+                critique_output_tokens = int(token_count * 1.5)
                 
-                # 2. For applying critique feedback, we input original, translation, and critique
-                feedback_input_tokens = token_count * 3.5  # original + translation + critique feedback
+                # 2. For applying critique feedback, we input system prompt + original + translation + critique
+                feedback_input_tokens = system_prompt_tokens + (token_count * 3.5)  # original + translation + critique feedback
                 # Output is similar to the translation
                 feedback_output_tokens = token_count
                 

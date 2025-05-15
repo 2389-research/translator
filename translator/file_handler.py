@@ -119,4 +119,4 @@ class FileHandler:
             The path to the log file
         """
         output_path = Path(output_file)
-        return str(output_path.with_suffix(f"{output_path.suffix}.log"))
+        return str(output_path.with_suffix(f"{output_path.suffix}.log.json"))

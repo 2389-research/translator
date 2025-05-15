@@ -37,12 +37,16 @@ class TokenCounter:
             return len(encoding.encode(text))
 
     @classmethod
-    def check_token_limits(cls, content: str, model: str) -> Tuple[bool, int]:
+    def check_token_limits(cls, content: str, model: str, with_edit: bool = True, 
+                          with_critique: bool = True, critique_loops: int = 4) -> Tuple[bool, int]:
         """Check if content is within token limits for the model.
         
         Args:
             content: The text content to check
             model: The model name to check against
+            with_edit: Whether editing will be performed
+            with_critique: Whether critique will be performed
+            critique_loops: Number of critique loops planned
             
         Returns:
             Tuple containing:
@@ -54,8 +58,27 @@ class TokenCounter:
         # Get max tokens for the model
         max_tokens = ModelConfig.get_max_tokens(model)
         
-        # We need room for system prompt, translation, and response
-        # Estimate total tokens needed as 2.5x the input content
-        estimated_total = token_count * 2.5
+        # Base token usage for translation
+        # Translation system prompt (~200 tokens) + content + output content
+        estimated_total = 200 + token_count + token_count  # ~2x content size for translation step
+        
+        # Add editing tokens if enabled
+        if with_edit:
+            # Editing needs original + translated content + system prompt + output
+            edit_tokens = 200 + (token_count * 2) + token_count
+            estimated_total += edit_tokens
+        
+        # Add critique tokens if enabled
+        if with_critique and critique_loops > 0:
+            for _ in range(critique_loops):
+                # Each critique cycle has two steps:
+                
+                # 1. Critique generation (original + translated + system prompt + output critique)
+                critique_tokens = 200 + (token_count * 2) + int(token_count * 1.5)
+                
+                # 2. Critique application (original + translated + critique + system prompt + output)
+                feedback_tokens = 200 + (token_count * 3.5) + token_count
+                
+                estimated_total += critique_tokens + feedback_tokens
         
         return (estimated_total <= max_tokens, token_count)

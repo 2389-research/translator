@@ -48,3 +48,6 @@ venv.bak/
 *.*.md
 
 **/.claude/settings.local.json
+output.txt
+
+
