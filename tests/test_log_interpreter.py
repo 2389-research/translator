@@ -86,7 +86,9 @@ class TestLogInterpreter(unittest.TestCase):
         # Mock the OpenAI API response
         mock_response = MagicMock()
         mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.content = (
+        mock_response.choices[
+            0
+        ].message.content = (
             "This is a narrative interpretation of the translation process."
         )
         self.mock_client.chat.completions.create.return_value = mock_response

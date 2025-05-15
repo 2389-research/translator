@@ -815,31 +815,32 @@ class TranslatorCLI:
             console.print("  [dim]...(see full narrative in the narrative file)[/dim]")
 
     @classmethod
-    def run(cls) -> None:
-        """Run the translator command-line interface."""
-        args = cls.parse_arguments()
+    def translate_file(
+        cls,
+        input_file: str,
+        target_language: str,
+        output_file: Optional[str],
+        model: str,
+        skip_edit: bool,
+        do_critique: bool,
+        critique_loops: int,
+        translator: Translator,
+    ) -> Tuple[str, str, str]:
+        """Translate a file to the target language.
 
-        # Parse and validate arguments
-        (
-            input_file,
-            target_language,
-            output_file,
-            model,
-            skip_edit,
-            do_critique,
-            critique_loops,
-            estimate_only,
-            has_valid_input,
-        ) = cls._parse_and_validate_args(args)
+        Args:
+            input_file: Path to the input file
+            target_language: Target language for translation
+            output_file: Optional custom output file path
+            model: Model to use for translation
+            skip_edit: Whether to skip the editing step
+            do_critique: Whether to perform critique
+            critique_loops: Number of critique loops to perform
+            translator: Translator instance
 
-        if not has_valid_input:
-            sys.exit(1)
-
-        # Set up OpenAI client and translator
-        client = cls.setup_openai_client()
-        translator = Translator(client)
-
-        # Read input file
+        Returns:
+            Tuple containing: output_path, log_path, narrative_path
+        """
         console.print(f"[bold]Reading file:[/] {escape(input_file)}")
         content = FileHandler.read_file(input_file)
 
@@ -853,26 +854,6 @@ class TranslatorCLI:
         ) = cls._process_content(input_file, content, model)
         if content_size_message:
             console.print(content_size_message)
-
-        # Check token limits and estimate cost
-        within_limits, token_count, cost, cost_str, should_continue = (
-            cls._check_limits_and_estimate_cost(
-                content,
-                content_for_translation,
-                model,
-                skip_edit,
-                do_critique,
-                critique_loops,
-                estimate_only,
-            )
-        )
-
-        if not should_continue:
-            sys.exit(0)
-
-        # If only estimating, exit now
-        if estimate_only:
-            sys.exit(0)
 
         console.print(f"[bold]Translating to:[/] {escape(target_language)}")
         console.print(f"[bold]Using model:[/] {escape(model)}")
@@ -918,6 +899,23 @@ class TranslatorCLI:
             total_usage,
         )
 
+        # Calculate output paths before finalizing
+        output_path = FileHandler.get_output_filename(
+            input_file, target_language, output_file
+        )
+        log_path = FileHandler.get_log_filename(output_path)
+
+        # Get the narrative filename - format: filename.languagecode.log
+        base_parts = Path(output_path).stem.split(".")
+        if len(base_parts) >= 2:
+            # This handles the standard output format: filename.languagecode.ext
+            base = ".".join(base_parts[:2])  # Take filename and language code
+        else:
+            # Fallback for custom output paths
+            base = Path(output_path).stem
+
+        narrative_path = str(Path(output_path).parent / f"{base}.log")
+
         # Finalize translation, save results, and display summary
         cls._finalize_and_save(
             has_frontmatter,
@@ -939,4 +937,77 @@ class TranslatorCLI:
             feedback_usage,
             critique_usages,
             feedback_usages,
+        )
+
+        return output_path, log_path, narrative_path
+
+    @classmethod
+    def run(cls) -> None:
+        """Run the translator command-line interface."""
+        args = cls.parse_arguments()
+
+        # Parse and validate arguments
+        (
+            input_file,
+            target_language,
+            output_file,
+            model,
+            skip_edit,
+            do_critique,
+            critique_loops,
+            estimate_only,
+            has_valid_input,
+        ) = cls._parse_and_validate_args(args)
+
+        if not has_valid_input:
+            sys.exit(1)
+
+        # Read input file
+        content = FileHandler.read_file(input_file)
+
+        # Process content and extract frontmatter if present
+        (
+            content_for_translation,
+            has_frontmatter,
+            frontmatter_data,
+            frontmatter_usage,
+            content_size_message,
+        ) = cls._process_content(input_file, content, model)
+        if content_size_message:
+            console.print(content_size_message)
+
+        # Check token limits and estimate cost
+        within_limits, token_count, cost, cost_str, should_continue = (
+            cls._check_limits_and_estimate_cost(
+                content,
+                content_for_translation,
+                model,
+                skip_edit,
+                do_critique,
+                critique_loops,
+                estimate_only,
+            )
+        )
+
+        if not should_continue:
+            sys.exit(0)
+
+        # If only estimating, exit now
+        if estimate_only:
+            sys.exit(0)
+
+        # Set up OpenAI client and translator
+        client = cls.setup_openai_client()
+        translator = Translator(client)
+
+        # Translate the file
+        cls.translate_file(
+            input_file,
+            target_language,
+            output_file,
+            model,
+            skip_edit,
+            do_critique,
+            critique_loops,
+            translator,
         )
