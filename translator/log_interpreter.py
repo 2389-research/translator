@@ -43,12 +43,14 @@ class LogInterpreter:
             )
             return None
 
-    def generate_narrative(self, log_data: Dict, model: str = "o4-mini") -> str:
+    def generate_narrative(self, log_data: Dict, model: str = "o4-mini", stream: bool = False, cancellation_handler=None) -> str:
         """Generate a narrative interpretation of the translation log.
 
         Args:
             log_data: The log data dictionary
             model: The model to use for interpretation (default: o4-mini)
+            stream: Whether to stream responses (default: False)
+            cancellation_handler: Optional handler to check for cancellation requests
 
         Returns:
             A narrative interpretation of the translation process
@@ -124,9 +126,25 @@ Your narrative should be informative and helpful to someone who wants to underst
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
                 ],
+                stream=stream
             )
-
-            return response.choices[0].message.content
+            
+            if stream:
+                # For streaming, we collect the tokens as they arrive
+                full_response = ""
+                for chunk in response:
+                    # Check for cancellation if handler is provided
+                    if cancellation_handler and cancellation_handler.is_cancellation_requested():
+                        break
+                        
+                    if chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
+                        content = chunk.choices[0].delta.content
+                        full_response += content
+                        # Could print partial content here for live streaming
+                        
+                return full_response
+            else:
+                return response.choices[0].message.content
         except Exception as e:
             console.print(
                 f"[bold red]Error:[/] Failed to generate narrative: {escape(str(e))}"
