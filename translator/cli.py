@@ -93,6 +93,7 @@ class StreamingTokenDisplay:
     1. Token count as they arrive
     2. Estimated tokens per second
     3. Progress indicator
+    4. Elapsed time and estimated time remaining
     """
     
     def __init__(self, operation_name: str, model: str):
@@ -117,7 +118,8 @@ class StreamingTokenDisplay:
         self.tokens = 0
         
         # Create a live display that will be updated as tokens arrive
-        self.live = Live(self._generate_display(), refresh_per_second=4)
+        # Use auto_refresh=False to prevent screen artifacting
+        self.live = Live(self._generate_display(), refresh_per_second=4, auto_refresh=False)
         self.live.start()
         
     def update(self, new_tokens: int = 1):
@@ -139,7 +141,9 @@ class StreamingTokenDisplay:
             self.last_update_time = current_time
             
         # Update the live display
-        self.live.update(self._generate_display())
+        # Generate display once and use it to prevent flickering
+        display = self._generate_display()
+        self.live.update(display)
         
     def stop(self):
         """Stop the live display."""
@@ -147,6 +151,39 @@ class StreamingTokenDisplay:
             self.live.stop()
             self.live = None
             
+    def get_elapsed_time(self):
+        """Get the elapsed time formatted as a string.
+        
+        Returns:
+            Formatted elapsed time string
+        """
+        if self.start_time is None:
+            return "0s"
+        
+        elapsed = time.time() - self.start_time
+        return self._format_time(elapsed)
+            
+    def _format_time(self, seconds):
+        """Format seconds into minutes:seconds format.
+        
+        Args:
+            seconds: Time in seconds
+            
+        Returns:
+            Formatted time string as 'M:SS' or 'HH:MM:SS' for longer durations
+        """
+        if seconds < 60:
+            return f"{seconds:.1f}s"
+        elif seconds < 3600:
+            minutes = int(seconds // 60)
+            seconds = int(seconds % 60)
+            return f"{minutes}:{seconds:02d}"
+        else:
+            hours = int(seconds // 3600)
+            minutes = int((seconds % 3600) // 60)
+            seconds = int(seconds % 60)
+            return f"{hours}:{minutes:02d}:{seconds:02d}"
+    
     def _generate_display(self):
         """Generate the display renderables.
         
@@ -154,19 +191,38 @@ class StreamingTokenDisplay:
             A Panel containing the token count and statistics
         """
         elapsed = time.time() - self.start_time if self.start_time else 0
+        formatted_time = self._format_time(elapsed)
         
         # Create a text with token information
         text = Text()
         text.append(f"{self.operation_name} with model: ", style="bright_white")
         text.append(f"{self.model}\n", style="cyan")
-        text.append("Tokens: ", style="bright_white")
+        
+        # Add elapsed time with a clock emoji
+        text.append("⏱️ Time: ", style="bright_white")
+        text.append(f"{formatted_time}", style="magenta bold")
+        
+        # Add token count with a counter emoji
+        text.append("\n🔢 Tokens: ", style="bright_white")
         text.append(f"{self.tokens:,}", style="green bold")
         
         if elapsed > 1.0:
-            text.append("\nSpeed: ", style="bright_white")
+            # Add speed with a lightning emoji
+            text.append("\n⚡ Speed: ", style="bright_white")
             text.append(f"{self.tokens_per_second:.1f} tokens/sec", style="yellow")
-            text.append("\nElapsed: ", style="bright_white")
-            text.append(f"{elapsed:.1f}s", style="yellow")
+            
+            # Add estimated time if tokens are flowing
+            if self.tokens > 0 and self.tokens_per_second > 0:
+                # Calculate tokens per character based on a rough estimate
+                # This is very approximate but gives users a rough idea
+                estimated_total_tokens = self.tokens * 1.5  # Rough estimate
+                estimated_remaining = max(0, estimated_total_tokens - self.tokens)
+                
+                if estimated_remaining > 0 and self.tokens_per_second > 0:
+                    remaining_seconds = estimated_remaining / self.tokens_per_second
+                    remaining_formatted = self._format_time(remaining_seconds)
+                    text.append("\n⏳ Est. remaining: ", style="bright_white")
+                    text.append(f"{remaining_formatted}", style="cyan")
         
         # Create a panel with the text
         panel = Panel(
@@ -624,8 +680,9 @@ class TranslatorCLI:
                     # Stop the token display
                     token_display.stop()
                     
-                    # Show final count
-                    console.print(f"[bold green]Frontmatter translation complete![/] Generated [bold]{frontmatter_usage['completion_tokens']:,}[/] tokens")
+                    # Show final count and elapsed time
+                    elapsed_time = token_display.get_elapsed_time()
+                    console.print(f"[bold green]Frontmatter translation complete![/] Generated [bold]{frontmatter_usage['completion_tokens']:,}[/] tokens in [bold magenta]{elapsed_time}[/]")
                 else:
                     # Translate frontmatter fields without streaming
                     translated_frontmatter, frontmatter_usage, error_msg = (
@@ -701,8 +758,9 @@ class TranslatorCLI:
             # Stop the token display
             token_display.stop()
             
-            # Show final count
-            console.print(f"[bold green]Translation complete![/] Received [bold]{translation_usage['completion_tokens']:,}[/] tokens")
+            # Show final count and elapsed time
+            elapsed_time = token_display.get_elapsed_time()
+            console.print(f"[bold green]Translation complete![/] Received [bold]{translation_usage['completion_tokens']:,}[/] tokens in [bold magenta]{elapsed_time}[/]")
         else:
             # Traditional progress spinner (non-streaming)
             with Progress(
@@ -790,8 +848,9 @@ class TranslatorCLI:
                 # Stop the token display
                 token_display.stop()
                 
-                # Show final count
-                console.print(f"[bold green]Editing complete![/] Processed [bold]{edit_usage['completion_tokens']:,}[/] tokens")
+                # Show final count and elapsed time
+                elapsed_time = token_display.get_elapsed_time()
+                console.print(f"[bold green]Editing complete![/] Processed [bold]{edit_usage['completion_tokens']:,}[/] tokens in [bold magenta]{elapsed_time}[/]")
             else:
                 # Use Rich Progress bar for editing (non-streaming)
                 with Progress(
@@ -894,8 +953,9 @@ class TranslatorCLI:
                     # Stop the token display
                     token_display.stop()
                     
-                    # Show final count
-                    console.print(f"[bold green]Critique complete![/] Generated [bold]{loop_critique_usage['completion_tokens']:,}[/] tokens")
+                    # Show final count and elapsed time
+                    elapsed_time = token_display.get_elapsed_time()
+                    console.print(f"[bold green]Critique complete![/] Generated [bold]{loop_critique_usage['completion_tokens']:,}[/] tokens in [bold magenta]{elapsed_time}[/]")
                 else:
                     # Use Rich Progress bar for critique generation (non-streaming)
                     with Progress(
@@ -980,8 +1040,9 @@ class TranslatorCLI:
                     # Stop the token display
                     token_display.stop()
                     
-                    # Show final count
-                    console.print(f"[bold green]Critique application complete![/] Generated [bold]{loop_feedback_usage['completion_tokens']:,}[/] tokens")
+                    # Show final count and elapsed time
+                    elapsed_time = token_display.get_elapsed_time()
+                    console.print(f"[bold green]Critique application complete![/] Generated [bold]{loop_feedback_usage['completion_tokens']:,}[/] tokens in [bold magenta]{elapsed_time}[/]")
                 else:
                     # Use Rich Progress bar for applying feedback (non-streaming)
                     with Progress(
