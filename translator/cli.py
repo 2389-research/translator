@@ -393,9 +393,9 @@ class TranslatorCLI:
             console.print(
                 "Consider splitting the file into smaller parts or using a model with a higher token limit."
             )
-            if not estimate_only:
-                if not cls.confirm("Continue anyway?"):
-                    should_continue = False
+            # Skip confirmation dialog when in estimate-only mode
+            if not estimate_only and not cls.confirm("Continue anyway?"):
+                should_continue = False
 
         return within_limits, token_count, cost, cost_str, should_continue
 
