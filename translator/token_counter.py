@@ -3,6 +3,7 @@
 # ABOUTME: Provides functions to count tokens and check token limits.
 
 from typing import Tuple
+from functools import lru_cache
 
 import tiktoken
 
@@ -11,9 +12,26 @@ from translator.config import ModelConfig
 
 class TokenCounter:
     """Token counting utilities for OpenAI API usage."""
-
+    
     @staticmethod
-    def count_tokens(text: str, model: str) -> int:
+    @lru_cache(maxsize=8)
+    def _get_encoding(model_name: str):
+        """Get and cache encoding for a specific model.
+        
+        Args:
+            model_name: The model name to get encoding for
+            
+        Returns:
+            The encoding for the specified model
+        """
+        try:
+            return tiktoken.encoding_for_model(model_name)
+        except Exception:
+            # Fallback to cl100k_base if model-specific encoding not found
+            return tiktoken.get_encoding("cl100k_base")
+
+    @classmethod
+    def count_tokens(cls, text: str, model: str) -> int:
         """Count the number of tokens in a text string for a specific model.
 
         Args:
@@ -23,18 +41,13 @@ class TokenCounter:
         Returns:
             The number of tokens in the text
         """
-        try:
-            # Use gpt-4 encoder for o3 model
-            model_name = model
-            if model == "o3":
-                model_name = "gpt-4"
+        # Use gpt-4 encoder for o3 model
+        model_name = model
+        if model == "o3":
+            model_name = "gpt-4"
 
-            encoding = tiktoken.encoding_for_model(model_name)
-            return len(encoding.encode(text))
-        except Exception:
-            # Fallback to cl100k_base if model-specific encoding not found
-            encoding = tiktoken.get_encoding("cl100k_base")
-            return len(encoding.encode(text))
+        encoding = cls._get_encoding(model_name)
+        return len(encoding.encode(text))
 
     @classmethod
     def check_token_limits(
