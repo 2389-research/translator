@@ -28,13 +28,11 @@ jobs:
                   version: "latest"
 
             - name: Build coverage file
-
               run: |
-                  uv run pytest --cov=. --cov-report=term-missing --cov-report "xml:coverage.xml"
+                pytest --junitxml=pytest.xml --cov-report=term-missing:skip-covered --cov=app tests/ | tee pytest-coverage.txt
 
             - name: Pytest coverage comment
               uses: MishaKav/pytest-coverage-comment@main
               with:
-                  pytest-xml-coverage-path: coverage.xml
-                  hide-badge: false
-                  hide-report: false
+                  pytest-coverage-path: ./pytest-coverage.txt
+                  junitxml-path: ./pytest.xml
