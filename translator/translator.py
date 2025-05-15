@@ -11,7 +11,17 @@ from translator.prompts import Prompts
 
 
 class Translator:
-    """Core translation logic using OpenAI's API."""
+    """Core translation logic using OpenAI's API.
+    
+    This class provides methods for translating text, editing translations, 
+    critiquing translations, and applying critique feedback. All methods support 
+    both streaming and non-streaming responses from the OpenAI API.
+    
+    Streaming responses provide the following benefits:
+    1. Lower latency for displaying initial results
+    2. More responsive user experience
+    3. Possibility of cancelling long-running requests
+    """
 
     def __init__(self, client: openai.OpenAI):
         """Initialize the translator.
@@ -30,7 +40,8 @@ class Translator:
         }
 
     def translate_text(
-        self, text: str, target_language: str, model: str
+        self, text: str, target_language: str, model: str, stream: bool = False,
+        cancellation_handler=None
     ) -> Tuple[Optional[str], Dict, Optional[str]]:
         """Translate text to the target language using OpenAI.
 
@@ -38,6 +49,8 @@ class Translator:
             text: The text to translate
             target_language: The target language for translation
             model: The model to use for translation
+            stream: Whether to stream responses (default: False)
+            cancellation_handler: Optional handler to check for cancellation requests
 
         Returns:
             Tuple containing:
@@ -61,32 +74,76 @@ class Translator:
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
                 ],
+                stream=stream
             )
 
-            # Extract usage statistics
-            usage = {
-                "prompt_tokens": response.usage.prompt_tokens,
-                "completion_tokens": response.usage.completion_tokens,
-                "total_tokens": response.usage.total_tokens,
-            }
+            # Handle streaming response
+            if stream:
+                # For streaming, we collect tokens and manually track usage
+                full_response = ""
+                # Initialize estimated usage with empty values
+                usage = {
+                    "prompt_tokens": 0,  # Will estimate later
+                    "completion_tokens": 0,  # Will count during streaming
+                    "total_tokens": 0,  # Will calculate at the end
+                }
+                
+                for chunk in response:
+                    # Check for cancellation if handler is provided
+                    if cancellation_handler and cancellation_handler.is_cancellation_requested():
+                        break
+                        
+                    if chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
+                        content = chunk.choices[0].delta.content
+                        full_response += content
+                        # Count tokens in chunk.choices[0].delta.content
+                        usage["completion_tokens"] += 1  # This is a rough estimate
+                
+                # Estimate prompt tokens based on input length
+                from translator.token_counter import TokenCounter
+                prompt_str = system_prompt + user_prompt
+                usage["prompt_tokens"] = TokenCounter.count_tokens(prompt_str, model)
+                usage["total_tokens"] = usage["prompt_tokens"] + usage["completion_tokens"]
+                
+                # Log the translation prompts and response
+                self.translation_log["translation"] = {
+                    "model": model,
+                    "target_language": target_language,
+                    "system_prompt": system_prompt,
+                    "user_prompt": user_prompt,
+                    "response": full_response,
+                    "usage": usage,
+                    "streaming": True,
+                }
+                
+                return full_response, usage, None
+            else:
+                # Extract usage statistics
+                usage = {
+                    "prompt_tokens": response.usage.prompt_tokens,
+                    "completion_tokens": response.usage.completion_tokens,
+                    "total_tokens": response.usage.total_tokens,
+                }
 
-            # Log the translation prompts and response
-            self.translation_log["translation"] = {
-                "model": model,
-                "target_language": target_language,
-                "system_prompt": system_prompt,
-                "user_prompt": user_prompt,
-                "response": response.choices[0].message.content,
-                "usage": usage,
-            }
+                # Log the translation prompts and response
+                self.translation_log["translation"] = {
+                    "model": model,
+                    "target_language": target_language,
+                    "system_prompt": system_prompt,
+                    "user_prompt": user_prompt,
+                    "response": response.choices[0].message.content,
+                    "usage": usage,
+                    "streaming": False,
+                }
 
-            return response.choices[0].message.content, usage, None
+                return response.choices[0].message.content, usage, None
         except Exception as e:
             error_msg = f"Translation failed: {str(e)}"
             return None, empty_usage, error_msg
 
     def edit_translation(
-        self, translated_text: str, original_text: str, target_language: str, model: str
+        self, translated_text: str, original_text: str, target_language: str, model: str,
+        stream: bool = False, cancellation_handler=None
     ) -> Tuple[str, Dict, Optional[str]]:
         """Edit the translation to ensure it makes sense in the target language while preserving original meaning.
 
@@ -95,6 +152,8 @@ class Translator:
             original_text: The original text for reference
             target_language: The target language
             model: The model to use for editing
+            stream: Whether to stream responses (default: False)
+            cancellation_handler: Optional handler to check for cancellation requests
 
         Returns:
             Tuple containing:
@@ -126,34 +185,82 @@ class Translator:
             # Add top_p for models that support it
             if model != "o3":
                 params["top_p"] = 1.0
-
+                
+            # Add stream parameter if requested
+            if stream:
+                params["stream"] = True
+            
             response = self.client.chat.completions.create(**params)
+            
+            # Handle streaming response
+            if stream:
+                # For streaming, we collect tokens and manually track usage
+                full_response = ""
+                # Initialize estimated usage with empty values
+                usage = {
+                    "prompt_tokens": 0,  # Will estimate later
+                    "completion_tokens": 0,  # Will count during streaming
+                    "total_tokens": 0,  # Will calculate at the end
+                }
+                
+                for chunk in response:
+                    # Check for cancellation if handler is provided
+                    if cancellation_handler and cancellation_handler.is_cancellation_requested():
+                        break
+                        
+                    if chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
+                        content = chunk.choices[0].delta.content
+                        full_response += content
+                        # Count tokens in chunk.choices[0].delta.content
+                        usage["completion_tokens"] += 1  # This is a rough estimate
+                
+                # Estimate prompt tokens based on input length
+                from translator.token_counter import TokenCounter
+                # Estimate prompt tokens by combining system and user prompts
+                prompt_str = system_prompt + user_prompt
+                usage["prompt_tokens"] = TokenCounter.count_tokens(prompt_str, model)
+                usage["total_tokens"] = usage["prompt_tokens"] + usage["completion_tokens"]
+                
+                # Log the editing prompts and response
+                self.translation_log["editing"] = {
+                    "model": model,
+                    "target_language": target_language,
+                    "system_prompt": system_prompt,
+                    "user_prompt": user_prompt,
+                    "response": full_response,
+                    "usage": usage,
+                    "streaming": True,
+                }
+                
+                return full_response, usage, None
+            else:
+                # Extract usage statistics
+                usage = {
+                    "prompt_tokens": response.usage.prompt_tokens,
+                    "completion_tokens": response.usage.completion_tokens,
+                    "total_tokens": response.usage.total_tokens,
+                }
 
-            # Extract usage statistics
-            usage = {
-                "prompt_tokens": response.usage.prompt_tokens,
-                "completion_tokens": response.usage.completion_tokens,
-                "total_tokens": response.usage.total_tokens,
-            }
+                # Log the editing prompts and response
+                self.translation_log["editing"] = {
+                    "model": model,
+                    "target_language": target_language,
+                    "system_prompt": system_prompt,
+                    "user_prompt": user_prompt,
+                    "response": response.choices[0].message.content,
+                    "usage": usage,
+                    "streaming": False,
+                }
 
-            # Log the editing prompts and response
-            self.translation_log["editing"] = {
-                "model": model,
-                "target_language": target_language,
-                "system_prompt": system_prompt,
-                "user_prompt": user_prompt,
-                "response": response.choices[0].message.content,
-                "usage": usage,
-            }
-
-            return response.choices[0].message.content, usage, None
+                return response.choices[0].message.content, usage, None
         except Exception as e:
             error_msg = f"Editing failed: {str(e)}"
             # Return original translation if editing fails with empty usage stats
             return translated_text, empty_usage, error_msg
 
     def critique_translation(
-        self, translated_text: str, original_text: str, target_language: str, model: str
+        self, translated_text: str, original_text: str, target_language: str, model: str,
+        stream: bool = False, cancellation_handler=None
     ) -> Tuple[str, Dict, str, Optional[str]]:
         """Aggressively critique the translation against the original text.
 
@@ -162,6 +269,8 @@ class Translator:
             original_text: The original text for reference
             target_language: The target language
             model: The model to use for critique
+            stream: Whether to stream responses (default: False)
+            cancellation_handler: Optional handler to check for cancellation requests
 
         Returns:
             Tuple containing:
@@ -192,29 +301,77 @@ class Translator:
             # Add temperature for models other than o3
             if model != "o3":
                 params["temperature"] = 0.7
+                
+            # Add stream parameter if requested
+            if stream:
+                params["stream"] = True
 
             response = self.client.chat.completions.create(**params)
+            
+            # Handle streaming response
+            if stream:
+                # For streaming, we collect tokens and manually track usage
+                full_response = ""
+                # Initialize estimated usage with empty values
+                usage = {
+                    "prompt_tokens": 0,  # Will estimate later
+                    "completion_tokens": 0,  # Will count during streaming
+                    "total_tokens": 0,  # Will calculate at the end
+                }
+                
+                for chunk in response:
+                    # Check for cancellation if handler is provided
+                    if cancellation_handler and cancellation_handler.is_cancellation_requested():
+                        break
+                        
+                    if chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
+                        content = chunk.choices[0].delta.content
+                        full_response += content
+                        # Count tokens in chunk.choices[0].delta.content
+                        usage["completion_tokens"] += 1  # This is a rough estimate
+                
+                # Estimate prompt tokens based on input length
+                from translator.token_counter import TokenCounter
+                # Estimate prompt tokens by combining system and user prompts
+                prompt_str = system_prompt + user_prompt
+                usage["prompt_tokens"] = TokenCounter.count_tokens(prompt_str, model)
+                usage["total_tokens"] = usage["prompt_tokens"] + usage["completion_tokens"]
+                
+                # Log the critique prompts and response
+                self.translation_log["critique"] = {
+                    "model": model,
+                    "target_language": target_language,
+                    "system_prompt": system_prompt,
+                    "user_prompt": user_prompt,
+                    "response": full_response,
+                    "usage": usage,
+                    "streaming": True,
+                }
+                
+                critique_feedback = full_response
+                return translated_text, usage, critique_feedback, None
+            else:
+                # Extract usage statistics
+                usage = {
+                    "prompt_tokens": response.usage.prompt_tokens,
+                    "completion_tokens": response.usage.completion_tokens,
+                    "total_tokens": response.usage.total_tokens,
+                }
 
-            # Extract usage statistics
-            usage = {
-                "prompt_tokens": response.usage.prompt_tokens,
-                "completion_tokens": response.usage.completion_tokens,
-                "total_tokens": response.usage.total_tokens,
-            }
+                critique_feedback = response.choices[0].message.content
 
-            critique_feedback = response.choices[0].message.content
+                # Log the critique prompts and response
+                self.translation_log["critique"] = {
+                    "model": model,
+                    "target_language": target_language,
+                    "system_prompt": system_prompt,
+                    "user_prompt": user_prompt,
+                    "response": critique_feedback,
+                    "usage": usage,
+                    "streaming": False,
+                }
 
-            # Log the critique prompts and response
-            self.translation_log["critique"] = {
-                "model": model,
-                "target_language": target_language,
-                "system_prompt": system_prompt,
-                "user_prompt": user_prompt,
-                "response": critique_feedback,
-                "usage": usage,
-            }
-
-            return translated_text, usage, critique_feedback, None
+                return translated_text, usage, critique_feedback, None
         except Exception as e:
             error_msg = f"Critique failed: {str(e)}"
             # Return original translation if critique fails with empty usage stats
@@ -227,6 +384,8 @@ class Translator:
         critique_feedback: str,
         target_language: str,
         model: str,
+        stream: bool = False,
+        cancellation_handler=None,
     ) -> Tuple[str, Dict, Optional[str]]:
         """Apply critique feedback to improve the translation.
 
@@ -236,6 +395,8 @@ class Translator:
             critique_feedback: The detailed critique feedback
             target_language: The target language
             model: The model to use for applying feedback
+            stream: Whether to stream responses (default: False)
+            cancellation_handler: Optional handler to check for cancellation requests
 
         Returns:
             Tuple containing:
@@ -267,27 +428,74 @@ class Translator:
             # Add temperature for models other than o3
             if model != "o3":
                 params["temperature"] = 0.5
+                
+            # Add stream parameter if requested
+            if stream:
+                params["stream"] = True
 
             response = self.client.chat.completions.create(**params)
+            
+            # Handle streaming response
+            if stream:
+                # For streaming, we collect tokens and manually track usage
+                full_response = ""
+                # Initialize estimated usage with empty values
+                usage = {
+                    "prompt_tokens": 0,  # Will estimate later
+                    "completion_tokens": 0,  # Will count during streaming
+                    "total_tokens": 0,  # Will calculate at the end
+                }
+                
+                for chunk in response:
+                    # Check for cancellation if handler is provided
+                    if cancellation_handler and cancellation_handler.is_cancellation_requested():
+                        break
+                        
+                    if chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
+                        content = chunk.choices[0].delta.content
+                        full_response += content
+                        # Count tokens in chunk.choices[0].delta.content
+                        usage["completion_tokens"] += 1  # This is a rough estimate
+                
+                # Estimate prompt tokens based on input length
+                from translator.token_counter import TokenCounter
+                # Estimate prompt tokens by combining system and user prompts
+                prompt_str = system_prompt + user_prompt
+                usage["prompt_tokens"] = TokenCounter.count_tokens(prompt_str, model)
+                usage["total_tokens"] = usage["prompt_tokens"] + usage["completion_tokens"]
+                
+                # Log the feedback application prompts and response
+                self.translation_log["feedback"] = {
+                    "model": model,
+                    "target_language": target_language,
+                    "system_prompt": system_prompt,
+                    "user_prompt": user_prompt,
+                    "response": full_response,
+                    "usage": usage,
+                    "streaming": True,
+                }
+                
+                return full_response, usage, None
+            else:
+                # Extract usage statistics
+                usage = {
+                    "prompt_tokens": response.usage.prompt_tokens,
+                    "completion_tokens": response.usage.completion_tokens,
+                    "total_tokens": response.usage.total_tokens,
+                }
 
-            # Extract usage statistics
-            usage = {
-                "prompt_tokens": response.usage.prompt_tokens,
-                "completion_tokens": response.usage.completion_tokens,
-                "total_tokens": response.usage.total_tokens,
-            }
+                # Log the feedback application prompts and response
+                self.translation_log["feedback"] = {
+                    "model": model,
+                    "target_language": target_language,
+                    "system_prompt": system_prompt,
+                    "user_prompt": user_prompt,
+                    "response": response.choices[0].message.content,
+                    "usage": usage,
+                    "streaming": False,
+                }
 
-            # Log the feedback application prompts and response
-            self.translation_log["feedback"] = {
-                "model": model,
-                "target_language": target_language,
-                "system_prompt": system_prompt,
-                "user_prompt": user_prompt,
-                "response": response.choices[0].message.content,
-                "usage": usage,
-            }
-
-            return response.choices[0].message.content, usage, None
+                return response.choices[0].message.content, usage, None
         except Exception as e:
             error_msg = f"Failed to apply critique feedback: {str(e)}"
             # Return original translation if applying critique feedback fails
@@ -299,6 +507,8 @@ class Translator:
         fields: List[str],
         target_language: str,
         model: str,
+        stream: bool = False,
+        cancellation_handler=None,
     ) -> Tuple[Dict, Dict, Optional[str]]:
         """Translate specified fields in frontmatter.
 
@@ -307,6 +517,8 @@ class Translator:
             fields: List of fields to translate
             target_language: The target language
             model: The model to use for translation
+            stream: Whether to stream responses (default: False)
+            cancellation_handler: Optional handler to check for cancellation requests
 
         Returns:
             Tuple containing:
@@ -341,28 +553,73 @@ class Translator:
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
                 ],
+                stream=stream
             )
 
-            # Extract usage statistics
-            usage = {
-                "prompt_tokens": response.usage.prompt_tokens,
-                "completion_tokens": response.usage.completion_tokens,
-                "total_tokens": response.usage.total_tokens,
-            }
+            # Handle streaming response
+            if stream:
+                # For streaming, we collect tokens and manually track usage
+                full_response = ""
+                # Initialize estimated usage with empty values
+                usage = {
+                    "prompt_tokens": 0,  # Will estimate later
+                    "completion_tokens": 0,  # Will count during streaming
+                    "total_tokens": 0,  # Will calculate at the end
+                }
+                
+                for chunk in response:
+                    # Check for cancellation if handler is provided
+                    if cancellation_handler and cancellation_handler.is_cancellation_requested():
+                        break
+                        
+                    if chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
+                        content = chunk.choices[0].delta.content
+                        full_response += content
+                        # Count tokens in chunk.choices[0].delta.content
+                        usage["completion_tokens"] += 1  # This is a rough estimate
+                
+                # Estimate prompt tokens based on input length
+                from translator.token_counter import TokenCounter
+                # Estimate prompt tokens by combining system and user prompts
+                prompt_str = system_prompt + user_prompt
+                usage["prompt_tokens"] = TokenCounter.count_tokens(prompt_str, model)
+                usage["total_tokens"] = usage["prompt_tokens"] + usage["completion_tokens"]
+                
+                # Log the frontmatter translation prompts and response
+                self.translation_log["frontmatter"] = {
+                    "model": model,
+                    "target_language": target_language,
+                    "system_prompt": system_prompt,
+                    "user_prompt": user_prompt,
+                    "response": full_response,
+                    "usage": usage,
+                    "fields": fields,
+                    "streaming": True,
+                }
+                
+                translated_text = full_response
+            else:
+                # Extract usage statistics
+                usage = {
+                    "prompt_tokens": response.usage.prompt_tokens,
+                    "completion_tokens": response.usage.completion_tokens,
+                    "total_tokens": response.usage.total_tokens,
+                }
 
-            # Parse the response to get translated fields
-            translated_text = response.choices[0].message.content
+                # Parse the response to get translated fields
+                translated_text = response.choices[0].message.content
 
-            # Log the frontmatter translation prompts and response
-            self.translation_log["frontmatter"] = {
-                "model": model,
-                "target_language": target_language,
-                "system_prompt": system_prompt,
-                "user_prompt": user_prompt,
-                "response": translated_text,
-                "usage": usage,
-                "fields": fields,
-            }
+                # Log the frontmatter translation prompts and response
+                self.translation_log["frontmatter"] = {
+                    "model": model,
+                    "target_language": target_language,
+                    "system_prompt": system_prompt,
+                    "user_prompt": user_prompt,
+                    "response": translated_text,
+                    "usage": usage,
+                    "fields": fields,
+                    "streaming": False,
+                }
 
             # Extract each translated field from the response
             for field in fields:

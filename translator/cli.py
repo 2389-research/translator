@@ -4,6 +4,7 @@
 
 import argparse
 import os
+import signal
 import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -25,6 +26,60 @@ from translator.translator import Translator
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
 console = Console()
+
+# Cancellation handler for early termination of streaming completions
+class CancellationHandler:
+    """Handles cancellation requests for streaming completions.
+    
+    This class provides a mechanism to handle keyboard interrupts (Ctrl+C) during
+    streaming completions. It registers a signal handler that sets a flag when
+    the user presses Ctrl+C, allowing the application to clean up gracefully.
+    
+    A second Ctrl+C will force an immediate exit.
+    """
+    
+    def __init__(self):
+        """Initialize the cancellation handler."""
+        self.cancel_requested = False
+        # Register the signal handler
+        signal.signal(signal.SIGINT, self._signal_handler)
+    
+    def _signal_handler(self, _sig, _frame):  # pylint: disable=unused-argument
+        """Handle SIGINT (Ctrl+C) signals.
+        
+        The first Ctrl+C sets the cancellation flag.
+        The second Ctrl+C forces an immediate exit.
+        
+        Args:
+            _sig: Signal number (unused)
+            _frame: Current stack frame (unused)
+        """
+        if not self.cancel_requested:
+            console.print("\n[bold yellow]Cancellation requested. Cleaning up...[/]")
+            self.cancel_requested = True
+            # We don't exit immediately - we set a flag and let the program clean up gracefully
+        else:
+            # If user presses Ctrl+C a second time, exit immediately
+            console.print("\n[bold red]Forced exit.[/]")
+            sys.exit(1)
+    
+    def is_cancellation_requested(self):
+        """Check if cancellation has been requested.
+        
+        Returns:
+            bool: True if cancellation has been requested, False otherwise.
+        """
+        return self.cancel_requested
+    
+    def reset(self):
+        """Reset the cancellation flag.
+        
+        Call this method at the beginning of each streaming operation.
+        """
+        self.cancel_requested = False
+        
+# Create a global cancellation handler instance
+cancellation = CancellationHandler()
 
 
 class TranslatorCLI:
@@ -441,12 +496,28 @@ class TranslatorCLI:
                     f"[bold]Translating frontmatter fields:[/] {', '.join(translatable_fields)}"
                 )
                 
-                # Translate frontmatter fields
-                translated_frontmatter, frontmatter_usage, error_msg = (
-                    translator.translate_frontmatter(
-                        frontmatter_data, translatable_fields, target_language, model
+                # Use streaming for improved user experience
+                use_streaming = True
+                
+                if use_streaming:
+                    # Custom progress display for streaming responses
+                    console.print("[dim]Streaming frontmatter translation as it arrives...[/]")
+                    
+                    # Pass cancellation handler and reset it before starting
+                    cancellation.reset()
+                    translated_frontmatter, frontmatter_usage, error_msg = (
+                        translator.translate_frontmatter(
+                            frontmatter_data, translatable_fields, target_language, model, stream=True,
+                            cancellation_handler=cancellation
+                        )
                     )
-                )
+                else:
+                    # Translate frontmatter fields without streaming
+                    translated_frontmatter, frontmatter_usage, error_msg = (
+                        translator.translate_frontmatter(
+                            frontmatter_data, translatable_fields, target_language, model, stream=False
+                        )
+                    )
                 
                 # Handle any error
                 if error_msg:
@@ -484,18 +555,32 @@ class TranslatorCLI:
         Returns:
             Tuple containing: translated_content, translation_usage
         """
-        # Use Rich Progress bar for translation
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[bold green]Translating...[/]"),
-            transient=True,
-        ) as progress:
-            progress.add_task("translating", total=None)
+        # Use streaming for improved user experience
+        use_streaming = True
+        
+        if use_streaming:
+            # Custom progress display for streaming responses
+            console.print("[bold green]Translating...[/]")
+            console.print("[dim]Streaming tokens as they arrive...[/]")
             
-            # Perform translation of main content and get token usage
+            # Pass cancellation handler and reset it before starting
+            cancellation.reset()
             translated_content, translation_usage, error_msg = translator.translate_text(
-                content_for_translation, target_language, model
+                content_for_translation, target_language, model, stream=True, cancellation_handler=cancellation
             )
+        else:
+            # Traditional progress spinner (non-streaming)
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[bold green]Translating...[/]"),
+                transient=True,
+            ) as progress:
+                progress.add_task("translating", total=None)
+                
+                # Perform translation of main content and get token usage
+                translated_content, translation_usage, error_msg = translator.translate_text(
+                    content_for_translation, target_language, model, stream=False
+                )
         
         # Handle any error
         if error_msg:
@@ -541,18 +626,32 @@ class TranslatorCLI:
         if not skip_edit:
             console.print("[bold]Editing translation for fluency and accuracy...[/]")
             
-            # Use Rich Progress bar for editing
-            with Progress(
-                SpinnerColumn(),
-                TextColumn("[bold green]Editing translation...[/]"),
-                transient=True,
-            ) as progress:
-                progress.add_task("editing", total=None)
+            # Use streaming for improved user experience
+            use_streaming = True
+            
+            if use_streaming:
+                # Custom progress display for streaming responses
+                console.print("[dim]Streaming edits as they arrive...[/]")
                 
-                # Perform editing
+                # Pass cancellation handler and reset it before starting
+                cancellation.reset()
                 translated_content, edit_usage, error_msg = translator.edit_translation(
-                    translated_content, content_for_translation, target_language, model
+                    translated_content, content_for_translation, target_language, model, stream=True,
+                    cancellation_handler=cancellation
                 )
+            else:
+                # Use Rich Progress bar for editing (non-streaming)
+                with Progress(
+                    SpinnerColumn(),
+                    TextColumn("[bold green]Editing translation...[/]"),
+                    transient=True,
+                ) as progress:
+                    progress.add_task("editing", total=None)
+                    
+                    # Perform editing without streaming
+                    translated_content, edit_usage, error_msg = translator.edit_translation(
+                        translated_content, content_for_translation, target_language, model, stream=False
+                    )
             
             # Handle any error
             if error_msg:
@@ -611,23 +710,44 @@ class TranslatorCLI:
                     f"[bold]Critique loop {loop+1}/{critique_loops}: Generating critique...[/]"
                 )
                 
-                # Use Rich Progress bar for critique generation
-                with Progress(
-                    SpinnerColumn(),
-                    TextColumn("[bold red]Generating critique...[/]"),
-                    transient=True,
-                ) as progress:
-                    progress.add_task("critiquing", total=None)
+                # Use streaming for improved user experience
+                use_streaming = True
+                
+                if use_streaming:
+                    # Custom progress display for streaming responses
+                    console.print("[dim]Streaming critique as it arrives...[/]")
                     
-                    # Generate critique
+                    # Pass cancellation handler and reset it before starting
+                    cancellation.reset()
                     _, loop_critique_usage, critique_feedback, error_msg = (
                         translator.critique_translation(
                             translated_content,
                             content_for_translation,
                             target_language,
                             model,
+                            stream=True,
+                            cancellation_handler=cancellation
                         )
                     )
+                else:
+                    # Use Rich Progress bar for critique generation (non-streaming)
+                    with Progress(
+                        SpinnerColumn(),
+                        TextColumn("[bold red]Generating critique...[/]"),
+                        transient=True,
+                    ) as progress:
+                        progress.add_task("critiquing", total=None)
+                        
+                        # Generate critique without streaming
+                        _, loop_critique_usage, critique_feedback, error_msg = (
+                            translator.critique_translation(
+                                translated_content,
+                                content_for_translation,
+                                target_language,
+                                model,
+                                stream=False
+                            )
+                        )
                 
                 # Handle any critique error
                 if error_msg:
@@ -661,15 +781,15 @@ class TranslatorCLI:
                     f"[bold]Critique loop {loop+1}/{critique_loops}: Applying critique feedback...[/]"
                 )
                 
-                # Use Rich Progress bar for applying feedback
-                with Progress(
-                    SpinnerColumn(),
-                    TextColumn("[bold blue]Applying critique feedback...[/]"),
-                    transient=True,
-                ) as progress:
-                    progress.add_task("applying_feedback", total=None)
+                # Use streaming for improved user experience
+                use_streaming = True
+                
+                if use_streaming:
+                    # Custom progress display for streaming responses
+                    console.print("[dim]Streaming feedback application results as they arrive...[/]")
                     
-                    # Apply feedback
+                    # Pass cancellation handler and reset it before starting
+                    cancellation.reset()
                     translated_content, loop_feedback_usage, error_msg = (
                         translator.apply_critique_feedback(
                             translated_content,
@@ -677,8 +797,30 @@ class TranslatorCLI:
                             critique_feedback,
                             target_language,
                             model,
+                            stream=True,
+                            cancellation_handler=cancellation
                         )
                     )
+                else:
+                    # Use Rich Progress bar for applying feedback (non-streaming)
+                    with Progress(
+                        SpinnerColumn(),
+                        TextColumn("[bold blue]Applying critique feedback...[/]"),
+                        transient=True,
+                    ) as progress:
+                        progress.add_task("applying_feedback", total=None)
+                        
+                        # Apply feedback without streaming
+                        translated_content, loop_feedback_usage, error_msg = (
+                            translator.apply_critique_feedback(
+                                translated_content,
+                                content_for_translation,
+                                critique_feedback,
+                                target_language,
+                                model,
+                                stream=False
+                            )
+                        )
                 
                 # Handle any feedback application error
                 if error_msg:
@@ -856,8 +998,8 @@ class TranslatorCLI:
         )
         log_interpreter = LogInterpreter(client)
 
-        # Generate the narrative
-        narrative = log_interpreter.generate_narrative(log_data, "o4-mini")
+        # Generate the narrative (using non-streaming for this since it's less critical)
+        narrative = log_interpreter.generate_narrative(log_data, "o4-mini", stream=False)
 
         # Get the narrative filename - format: filename.languagecode.log
         base_parts = Path(output_path).stem.split(".")
