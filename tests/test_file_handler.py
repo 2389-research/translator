@@ -131,7 +131,7 @@ def test_get_log_filename():
     """Test generating log filename based on output file."""
     output_file = "/path/to/document.es.txt"
     log_path = FileHandler.get_log_filename(output_file)
-    assert log_path == "/path/to/document.es.txt.log"
+    assert log_path == "/path/to/document.es.txt.log.json"
 
 
 def test_get_log_filename_different_extensions():
@@ -139,9 +139,9 @@ def test_get_log_filename_different_extensions():
     # Test with markdown file
     output_file = "/path/to/document.ja.md"
     log_path = FileHandler.get_log_filename(output_file)
-    assert log_path == "/path/to/document.ja.md.log"
+    assert log_path == "/path/to/document.ja.md.log.json"
 
     # Test with json file
     output_file = "/path/to/data.es.json"
     log_path = FileHandler.get_log_filename(output_file)
-    assert log_path == "/path/to/data.es.json.log"
+    assert log_path == "/path/to/data.es.json.log.json"

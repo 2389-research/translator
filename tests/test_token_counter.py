@@ -104,18 +104,30 @@ def test_check_token_limits_at_boundary():
     test_text = "Test text"
     token_count = 1000
 
+    # With token_count = 1000, the calculation in check_token_limits is:
+    # - Translation: 200 + 1000 + 1000 = 2200
+    # - Editing: 200 + (1000 * 2) + 1000 = 3200
+    # - Base total: 2200 + 3200 = 5400
+    # - For 4 critique cycles (default):
+    #   - Each cycle: [200 + (1000 * 2) + 1500] + [200 + (1000 * 3.5) + 1000] = 8400
+    #   - 4 cycles: 8400 * 4 = 33600
+    # - Total: 5400 + 33600 = 39000
+
+    # We need max_tokens >= 39000 to be within limits
+    # We need max_tokens < 39000 to be over limits
+
     # Mock methods to control the test
     with patch.object(TokenCounter, "count_tokens", return_value=token_count):
-        with patch.object(ModelConfig, "get_max_tokens", return_value=2500):
-            # At exactly max tokens / 2.5, should be within limits
+        with patch.object(ModelConfig, "get_max_tokens", return_value=40000):
+            # With max_tokens > 39000, should be within limits
             within_limits, counted_tokens = TokenCounter.check_token_limits(
                 test_text, "test-model"
             )
             assert within_limits is True
             assert counted_tokens == token_count
 
-        with patch.object(ModelConfig, "get_max_tokens", return_value=2499):
-            # Just under max tokens / 2.5, should be over limits
+        with patch.object(ModelConfig, "get_max_tokens", return_value=38000):
+            # With max_tokens < 39000, should be over limits
             within_limits, counted_tokens = TokenCounter.check_token_limits(
                 test_text, "test-model"
             )
@@ -128,21 +140,30 @@ def test_check_token_limits_different_models():
     test_text = "Test text for different models"
     token_count = 10
 
+    # With token_count = 10, the calculation in check_token_limits is:
+    # - Translation: 200 + 10 + 10 = 220
+    # - Editing: 200 + (10 * 2) + 10 = 230
+    # - Base total: 220 + 230 = 450
+    # - For 4 critique cycles (default):
+    #   - Each cycle: [200 + (10 * 2) + 15] + [200 + (10 * 3.5) + 10] = 450
+    #   - 4 cycles: 450 * 4 = 1800
+    # - Total: 450 + 1800 = 2250
+
     # Mock count_tokens to always return a fixed count
     with patch.object(TokenCounter, "count_tokens", return_value=token_count):
-        # Test with a small max_tokens model
-        with patch.object(ModelConfig, "get_max_tokens", return_value=20):
+        # Test with a small max_tokens model - below the required 2250 tokens
+        with patch.object(ModelConfig, "get_max_tokens", return_value=1000):
             within_limits, counted_tokens = TokenCounter.check_token_limits(
                 test_text, "small-model"
             )
-            assert within_limits is False  # 10 * 2.5 = 25 > 20
+            assert within_limits is False  # 1000 < 2250, so not within limits
 
-        # Test with a large max_tokens model
-        with patch.object(ModelConfig, "get_max_tokens", return_value=100):
+        # Test with a large max_tokens model - above the required 2250 tokens
+        with patch.object(ModelConfig, "get_max_tokens", return_value=3000):
             within_limits, counted_tokens = TokenCounter.check_token_limits(
                 test_text, "large-model"
             )
-            assert within_limits is True  # 10 * 2.5 = 25 < 100
+            assert within_limits is True  # 3000 > 2250, so within limits
 
 
 def test_check_token_limits_long_content():

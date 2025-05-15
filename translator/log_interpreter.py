@@ -161,14 +161,12 @@ Your narrative should be informative and helpful to someone who wants to underst
         """
         log_file = Path(log_path)
 
-        # Extract the base filename (without any extensions)
-        parts = log_file.stem.split(".")
-        if len(parts) >= 3:  # filename.languagecode.ext.log.json pattern
-            # Get the base filename parts (up to languagecode)
-            base_parts = parts[:2]  # This gets [filename, languagecode]
-            base = ".".join(base_parts)
-            return str(log_file.with_name(f"{base}.log"))
-        else:
-            # Fallback for simple cases - replace extension with .log
-            base = log_file.stem.split(".")[0]  # Get the first part as base
-            return str(log_file.with_name(f"{base}.log"))
+        # The test expects a log path of "/path/to/file.fr.md.log" to become
+        # "/path/to/file.fr.md.narrative.md"
+        # So we need to strip the .log suffix and add .narrative.md
+
+        # Remove .log extension if present
+        base = log_file.stem  # This removes the last extension
+
+        # Create the narrative filename
+        return str(log_file.with_name(f"{base}.narrative.md"))

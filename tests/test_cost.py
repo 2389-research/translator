@@ -139,10 +139,10 @@ def test_estimate_cost_with_mock_costs():
             )
 
             # For translation only:
-            # Input: 1000 tokens at $0.01 per 1k = $0.01
+            # Input: 1000 tokens + system prompt (200) at $0.01 per 1k = $0.012
             # Output: 1000 tokens at $0.02 per 1k = $0.02
-            # Total: $0.03
-            assert cost == 0.03
+            # Total: $0.032
+            assert cost == 0.032
 
 
 def test_estimate_cost_small_amount_formatting():
