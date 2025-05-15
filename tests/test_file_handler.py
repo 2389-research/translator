@@ -3,11 +3,9 @@
 # ABOUTME: Verifies file operations functionality.
 
 import os
-import sys
 import pytest
 import tempfile
-from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from translator.file_handler import FileHandler
 from translator.language import LanguageHandler
 
@@ -18,18 +16,18 @@ def temp_test_file():
     temp_dir = tempfile.TemporaryDirectory()
     test_file_path = os.path.join(temp_dir.name, "test_file.txt")
     test_content = "This is test content for file operations."
-    
+
     # Create a test file
-    with open(test_file_path, 'w', encoding='utf-8') as f:
+    with open(test_file_path, "w", encoding="utf-8") as f:
         f.write(test_content)
-    
+
     # Return the fixture data
     yield {
         "temp_dir": temp_dir,
         "test_file_path": test_file_path,
-        "test_content": test_content
+        "test_content": test_content,
     }
-    
+
     # Cleanup after tests
     temp_dir.cleanup()
 
@@ -51,11 +49,11 @@ def test_write_file(temp_test_file):
     """Test writing content to a file."""
     new_content = "This is new test content."
     new_file_path = os.path.join(temp_test_file["temp_dir"].name, "new_test_file.txt")
-    
+
     FileHandler.write_file(new_file_path, new_content)
-    
+
     # Verify the file was created and content is correct
-    with open(new_file_path, 'r', encoding='utf-8') as f:
+    with open(new_file_path, "r", encoding="utf-8") as f:
         assert f.read() == new_content
 
 
@@ -70,8 +68,10 @@ def test_get_output_filename_with_custom_output():
     input_file = "/path/to/document.txt"
     target_language = "Spanish"
     custom_output = "/path/to/output/translated.txt"
-    
-    output_path = FileHandler.get_output_filename(input_file, target_language, custom_output)
+
+    output_path = FileHandler.get_output_filename(
+        input_file, target_language, custom_output
+    )
     assert output_path == custom_output
 
 
@@ -79,8 +79,8 @@ def test_get_output_filename_without_custom_output():
     """Test generating output filenames without custom output."""
     input_file = "/path/to/document.txt"
     target_language = "Spanish"
-    
-    with patch.object(LanguageHandler, 'get_language_code', return_value="es"):
+
+    with patch.object(LanguageHandler, "get_language_code", return_value="es"):
         output_path = FileHandler.get_output_filename(input_file, target_language)
         assert output_path == "/path/to/document.es.txt"
 
@@ -88,13 +88,13 @@ def test_get_output_filename_without_custom_output():
 def test_get_output_filename_different_languages():
     """Test generating output filenames for different languages."""
     input_file = "/path/to/document.txt"
-    
-    with patch.object(LanguageHandler, 'get_language_code') as mock_get_language_code:
+
+    with patch.object(LanguageHandler, "get_language_code") as mock_get_language_code:
         # Test with Japanese
         mock_get_language_code.return_value = "ja"
         output_path = FileHandler.get_output_filename(input_file, "Japanese")
         assert output_path == "/path/to/document.ja.txt"
-        
+
         # Test with French
         mock_get_language_code.return_value = "fr"
         output_path = FileHandler.get_output_filename(input_file, "French")
@@ -106,14 +106,14 @@ def test_write_log():
     with tempfile.TemporaryDirectory() as temp_dir:
         log_path = os.path.join(temp_dir, "test.log")
         log_data = {"translation": "Test content", "model": "gpt-4"}
-        
+
         FileHandler.write_log(log_path, log_data)
-        
+
         # Verify the log file was created
         assert os.path.exists(log_path)
-        
+
         # Read and verify content (basic check)
-        with open(log_path, 'r', encoding='utf-8') as f:
+        with open(log_path, "r", encoding="utf-8") as f:
             content = f.read()
             assert "Test content" in content
             assert "gpt-4" in content
@@ -122,7 +122,7 @@ def test_write_log():
 
 def test_write_log_error():
     """Test error handling when writing log fails."""
-    with patch('builtins.open', side_effect=Exception("Test error")):
+    with patch("builtins.open", side_effect=Exception("Test error")):
         # Should not raise SystemExit, just print a warning
         FileHandler.write_log("/path/to/log.log", {"test": "data"})
 
@@ -131,7 +131,7 @@ def test_get_log_filename():
     """Test generating log filename based on output file."""
     output_file = "/path/to/document.es.txt"
     log_path = FileHandler.get_log_filename(output_file)
-    assert log_path == "/path/to/document.es.txt.log"
+    assert log_path == "/path/to/document.es.txt.log.json"
 
 
 def test_get_log_filename_different_extensions():
@@ -139,9 +139,9 @@ def test_get_log_filename_different_extensions():
     # Test with markdown file
     output_file = "/path/to/document.ja.md"
     log_path = FileHandler.get_log_filename(output_file)
-    assert log_path == "/path/to/document.ja.md.log"
-    
+    assert log_path == "/path/to/document.ja.md.log.json"
+
     # Test with json file
     output_file = "/path/to/data.es.json"
     log_path = FileHandler.get_log_filename(output_file)
-    assert log_path == "/path/to/data.es.json.log"
+    assert log_path == "/path/to/data.es.json.log.json"

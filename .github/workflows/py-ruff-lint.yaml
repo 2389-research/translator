@@ -1,0 +1,33 @@
+name: Python Code Linting with Ruff
+
+on:
+    workflow_dispatch: # Allow manual trigger
+    push:
+        branches:
+            - main
+   
+    pull_request:
+        branches:
+            - main
+  
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    ruff-lint:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout repository source code
+              uses: actions/checkout@v2
+
+            - name: Install uv package manager (latest version)
+              uses: astral-sh/setup-uv@v3
+              with:
+                  version: "latest"
+
+            - name: Execute Ruff linting check
+              run: |
+                  uvx ruff check

@@ -2,8 +2,7 @@
 # ABOUTME: Tests for the frontmatter handler module.
 # ABOUTME: Verifies frontmatter parsing and handling functionality.
 
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 import frontmatter
 import datetime
 from translator.frontmatter_handler import FrontmatterHandler
@@ -19,10 +18,12 @@ date: 2023-01-01
 ---
 This is the actual content of the document.
 """
-    
+
     # Call the method
-    has_frontmatter, metadata, content_without_frontmatter = FrontmatterHandler.parse_frontmatter(content)
-    
+    has_frontmatter, metadata, content_without_frontmatter = (
+        FrontmatterHandler.parse_frontmatter(content)
+    )
+
     # Verify results
     assert has_frontmatter is True
     assert isinstance(metadata, dict)
@@ -39,10 +40,12 @@ This is the actual content of the document.
 def test_parse_frontmatter_without_frontmatter():
     """Test parsing content without frontmatter."""
     content = "This is just regular content without any frontmatter."
-    
+
     # Call the method
-    has_frontmatter, metadata, content_without_frontmatter = FrontmatterHandler.parse_frontmatter(content)
-    
+    has_frontmatter, metadata, content_without_frontmatter = (
+        FrontmatterHandler.parse_frontmatter(content)
+    )
+
     # Verify results - should indicate no frontmatter was found
     assert has_frontmatter is False
     assert metadata is None
@@ -55,10 +58,12 @@ def test_parse_frontmatter_with_empty_frontmatter():
 ---
 This is content with empty frontmatter.
 """
-    
+
     # Call the method
-    has_frontmatter, metadata, content_without_frontmatter = FrontmatterHandler.parse_frontmatter(content)
-    
+    has_frontmatter, metadata, content_without_frontmatter = (
+        FrontmatterHandler.parse_frontmatter(content)
+    )
+
     # Empty frontmatter should be detected as not having frontmatter
     # The behavior may vary based on the python-frontmatter library implementation
     # Here we're adapting our test to the method's implementation
@@ -74,12 +79,14 @@ This is content with empty frontmatter.
 def test_parse_frontmatter_error_handling():
     """Test error handling during frontmatter parsing."""
     # Mock frontmatter.loads to raise an exception
-    with patch('frontmatter.loads', side_effect=Exception("Test error")):
+    with patch("frontmatter.loads", side_effect=Exception("Test error")):
         content = "Some content that will trigger an error when parsed."
-        
+
         # Call the method, should handle the exception gracefully
-        has_frontmatter, metadata, content_without_frontmatter = FrontmatterHandler.parse_frontmatter(content)
-        
+        has_frontmatter, metadata, content_without_frontmatter = (
+            FrontmatterHandler.parse_frontmatter(content)
+        )
+
         # Should return False and None values on error
         assert has_frontmatter is False
         assert metadata is None
@@ -96,18 +103,20 @@ def test_get_translatable_frontmatter_fields():
         "author": "Test Author",
         "tags": ["test", "example"],
         "summary": "Test Summary",
-        "draft": False
+        "draft": False,
     }
-    
+
     # Call the method
-    translatable_fields = FrontmatterHandler.get_translatable_frontmatter_fields(frontmatter_data)
-    
+    translatable_fields = FrontmatterHandler.get_translatable_frontmatter_fields(
+        frontmatter_data
+    )
+
     # Verify results
     assert isinstance(translatable_fields, list)
     assert "title" in translatable_fields
     assert "description" in translatable_fields
     assert "summary" in translatable_fields
-    
+
     # These fields should not be included as they're not typically translatable
     assert "date" not in translatable_fields
     assert "tags" not in translatable_fields
@@ -118,10 +127,12 @@ def test_get_translatable_frontmatter_fields_empty():
     """Test getting translatable fields from empty frontmatter."""
     # Create empty frontmatter
     frontmatter_data = {}
-    
+
     # Call the method
-    translatable_fields = FrontmatterHandler.get_translatable_frontmatter_fields(frontmatter_data)
-    
+    translatable_fields = FrontmatterHandler.get_translatable_frontmatter_fields(
+        frontmatter_data
+    )
+
     # Should return an empty list
     assert isinstance(translatable_fields, list)
     assert len(translatable_fields) == 0
@@ -135,16 +146,18 @@ def test_get_translatable_frontmatter_fields_non_standard():
         "meta_description": "Test Description",  # This should be detected
         "publish_date": "2023-01-01",
         "seo_title": "SEO Title",  # This should be detected
-        "random_field": "Random Value"
+        "random_field": "Random Value",
     }
-    
+
     # Call the method
-    translatable_fields = FrontmatterHandler.get_translatable_frontmatter_fields(frontmatter_data)
-    
+    translatable_fields = FrontmatterHandler.get_translatable_frontmatter_fields(
+        frontmatter_data
+    )
+
     # Verify results - should include fields with recognized patterns
     assert "meta_description" in translatable_fields
     assert "seo_title" in translatable_fields
-    
+
     # These fields should not be included
     assert "custom_title" not in translatable_fields
     assert "publish_date" not in translatable_fields
@@ -157,24 +170,24 @@ def test_reconstruct_with_frontmatter():
     metadata = {
         "title": "Test Title",
         "description": "Test Description",
-        "date": "2023-01-01"
+        "date": "2023-01-01",
     }
     content = "This is the content part of the document."
-    
+
     # Call the method
     reconstructed = FrontmatterHandler.reconstruct_with_frontmatter(metadata, content)
-    
+
     # Verify results
     assert isinstance(reconstructed, str)
     assert "---" in reconstructed  # Should contain frontmatter delimiters
     assert "title: Test Title" in reconstructed
     assert "description: Test Description" in reconstructed
-    
+
     # The date might be formatted differently depending on the library
     # Just verify it contains the date information
     assert "2023-01-01" in reconstructed
     assert content in reconstructed
-    
+
     # Parse the result to verify it's valid frontmatter
     post = frontmatter.loads(reconstructed)
     assert post.metadata["title"] == "Test Title"
@@ -187,15 +200,15 @@ def test_reconstruct_with_empty_frontmatter():
     # Create empty metadata and sample content
     metadata = {}
     content = "This is content with empty frontmatter."
-    
+
     # Call the method
     reconstructed = FrontmatterHandler.reconstruct_with_frontmatter(metadata, content)
-    
+
     # Verify results - should still include frontmatter delimiters
     assert isinstance(reconstructed, str)
     assert "---" in reconstructed
     assert content in reconstructed
-    
+
     # Parse the result to verify it's valid
     post = frontmatter.loads(reconstructed)
     assert len(post.metadata) == 0  # Should be empty
@@ -211,13 +224,13 @@ def test_reconstruct_with_complex_frontmatter():
         "nested": {"key1": "value1", "key2": "value2"},
         "numbers": [1, 2, 3],
         "boolean": True,
-        "null_value": None
+        "null_value": None,
     }
     content = "Content with complex frontmatter."
-    
+
     # Call the method
     reconstructed = FrontmatterHandler.reconstruct_with_frontmatter(metadata, content)
-    
+
     # Verify by parsing the result
     post = frontmatter.loads(reconstructed)
     assert post.metadata["title"] == "Test Title"
@@ -239,25 +252,31 @@ date: 2023-01-01
 ---
 This is the original content.
 """
-    
+
     # Parse the frontmatter
-    has_frontmatter, metadata, content_without_frontmatter = FrontmatterHandler.parse_frontmatter(original_content)
-    
+    has_frontmatter, metadata, content_without_frontmatter = (
+        FrontmatterHandler.parse_frontmatter(original_content)
+    )
+
     # Modify the metadata (simulating translation)
     metadata["title"] = "Translated Title"
     metadata["description"] = "Translated Description"
-    
+
     # Reconstruct with the modified metadata
-    reconstructed = FrontmatterHandler.reconstruct_with_frontmatter(metadata, content_without_frontmatter)
-    
+    reconstructed = FrontmatterHandler.reconstruct_with_frontmatter(
+        metadata, content_without_frontmatter
+    )
+
     # Verify the reconstructed content
     assert "Translated Title" in reconstructed
     assert "Translated Description" in reconstructed
     assert "2023-01-01" in reconstructed
     assert "This is the original content." in reconstructed
-    
+
     # Verify by parsing again
-    has_frontmatter2, metadata2, content2 = FrontmatterHandler.parse_frontmatter(reconstructed)
+    has_frontmatter2, metadata2, content2 = FrontmatterHandler.parse_frontmatter(
+        reconstructed
+    )
     assert has_frontmatter2 is True
     assert metadata2["title"] == "Translated Title"
     assert metadata2["description"] == "Translated Description"

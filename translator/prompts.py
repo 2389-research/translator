@@ -2,8 +2,6 @@
 # ABOUTME: Contains the prompts used for translation, editing, and critique.
 # ABOUTME: Provides a centralized location for all prompts used in the translation process.
 
-from typing import Dict, List
-
 
 class Prompts:
     """Class containing all prompts used in the translation process."""
@@ -11,10 +9,10 @@ class Prompts:
     @staticmethod
     def translation_system_prompt(target_language: str) -> str:
         """Get the system prompt for translation.
-        
+
         Args:
             target_language: The target language for translation
-            
+
         Returns:
             The system prompt for translation
         """
@@ -34,10 +32,10 @@ class Prompts:
     @staticmethod
     def translation_user_prompt(text: str) -> str:
         """Get the user prompt for translation.
-        
+
         Args:
             text: The text to translate
-            
+
         Returns:
             The user prompt for translation
         """
@@ -46,10 +44,10 @@ class Prompts:
     @staticmethod
     def editing_system_prompt(target_language: str) -> str:
         """Get the system prompt for editing the translation.
-        
+
         Args:
             target_language: The target language for translation
-            
+
         Returns:
             The system prompt for editing
         """
@@ -69,14 +67,16 @@ class Prompts:
         """
 
     @staticmethod
-    def editing_user_prompt(original_text: str, translated_text: str, target_language: str) -> str:
+    def editing_user_prompt(
+        original_text: str, translated_text: str, target_language: str
+    ) -> str:
         """Get the user prompt for editing the translation.
-        
+
         Args:
             original_text: The original text
             translated_text: The translated text
             target_language: The target language
-            
+
         Returns:
             The user prompt for editing
         """
@@ -92,10 +92,10 @@ Return ONLY the improved translated text without explanations or comments."""
     @staticmethod
     def critique_system_prompt(target_language: str) -> str:
         """Get the system prompt for critiquing the translation.
-        
+
         Args:
             target_language: The target language for translation
-            
+
         Returns:
             The system prompt for critique
         """
@@ -120,11 +120,11 @@ Your goal is to help create a perfect translation that reads as if originally wr
     @staticmethod
     def critique_user_prompt(original_text: str, translated_text: str) -> str:
         """Get the user prompt for critiquing the translation.
-        
+
         Args:
             original_text: The original text
             translated_text: The translated text
-            
+
         Returns:
             The user prompt for critique
         """
@@ -141,10 +141,10 @@ Include specific suggestions for how to fix each issue."""
     @staticmethod
     def feedback_system_prompt(target_language: str) -> str:
         """Get the system prompt for applying critique feedback.
-        
+
         Args:
             target_language: The target language for translation
-            
+
         Returns:
             The system prompt for applying feedback
         """
@@ -162,14 +162,16 @@ Do not ignore any of the critique points. Every issue identified must be address
 """
 
     @staticmethod
-    def feedback_user_prompt(original_text: str, translated_text: str, critique_feedback: str) -> str:
+    def feedback_user_prompt(
+        original_text: str, translated_text: str, critique_feedback: str
+    ) -> str:
         """Get the user prompt for applying critique feedback.
-        
+
         Args:
             original_text: The original text
             translated_text: The translated text
             critique_feedback: The critique feedback
-            
+
         Returns:
             The user prompt for applying feedback
         """
@@ -188,10 +190,10 @@ Return ONLY the improved translated text without explanations or comments."""
     @staticmethod
     def frontmatter_system_prompt(target_language: str) -> str:
         """Get the system prompt for translating frontmatter.
-        
+
         Args:
             target_language: The target language for translation
-            
+
         Returns:
             The system prompt for frontmatter translation
         """
@@ -202,10 +204,10 @@ Return the translated content in the exact same format, preserving all field nam
     @staticmethod
     def frontmatter_user_prompt(fields_text: str) -> str:
         """Get the user prompt for translating frontmatter.
-        
+
         Args:
             fields_text: The text containing frontmatter fields to translate
-            
+
         Returns:
             The user prompt for frontmatter translation
         """
