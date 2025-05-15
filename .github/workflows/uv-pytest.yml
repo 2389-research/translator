@@ -1,0 +1,34 @@
+name: Run unit tests
+
+on:
+    workflow_dispatch: # Allow manual trigger
+    push:
+        branches:
+            - main
+    
+    pull_request:
+        branches:
+            - main
+        
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    pytest:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v2
+
+            - name: Install the latest version of uv
+              uses: astral-sh/setup-uv@v3
+              with:
+                  version: "latest"
+
+            - name: Run tests
+
+              run: |
+                  uv run pytest tests
