@@ -47,3 +47,13 @@ repos:
           - id: prettier
             types_or: [toml]
             args: ["--write"]
+
+    - repo: local
+      hooks:
+          - id: python-test
+            name: "python: tests"
+            description: "Run python tests"
+            entry: uv run pytest
+            language: system
+            types: [python]
+            pass_filenames: false
