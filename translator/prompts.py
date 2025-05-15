@@ -60,10 +60,10 @@ class Prompts:
         6. Avoid adding new information or altering the core meaning.
         7. Ensure the final result doesn't feel machine-translated but remains faithful to the source.
         8. Make only changes that genuinely improve the text's quality in {target_language}.
-        7. Don't be too literal. If there isn't a direct translation, provide a natural-sounding translation.
-        9. If the text contains idioms or colloquialisms, translate them into the target language while maintaining their original meaning.
-        10. If the text contains technical terms or jargon, ensure that the translation is accurate and appropriate for the target audience, if there isn't a natural translation, keep it in the original language.
-        11. If there is not natural translation, keep it in the original language.
+        9. Don't be too literal. If there isn't a direct translation, provide a natural-sounding translation.
+        10. If the text contains idioms or colloquialisms, translate them into the target language while maintaining their original meaning.
+        11. If the text contains technical terms or jargon, ensure that the translation is accurate and appropriate for the target audience, if there isn't a natural translation, keep it in the original language.
+        12. If there is not natural translation, keep it in the original language.
         """
 
     @staticmethod
