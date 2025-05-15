@@ -41,7 +41,7 @@ class Translator:
 
     def translate_text(
         self, text: str, target_language: str, model: str, stream: bool = False,
-        cancellation_handler=None
+        cancellation_handler=None, token_callback=None
     ) -> Tuple[Optional[str], Dict, Optional[str]]:
         """Translate text to the target language using OpenAI.
 
@@ -51,6 +51,7 @@ class Translator:
             model: The model to use for translation
             stream: Whether to stream responses (default: False)
             cancellation_handler: Optional handler to check for cancellation requests
+            token_callback: Optional callback function called for each token during streaming
 
         Returns:
             Tuple containing:
@@ -98,6 +99,10 @@ class Translator:
                         full_response += content
                         # Count tokens in chunk.choices[0].delta.content
                         usage["completion_tokens"] += 1  # This is a rough estimate
+                        
+                        # Call the token callback if provided
+                        if token_callback:
+                            token_callback(content)
                 
                 # Estimate prompt tokens based on input length
                 from translator.token_counter import TokenCounter
@@ -143,7 +148,7 @@ class Translator:
 
     def edit_translation(
         self, translated_text: str, original_text: str, target_language: str, model: str,
-        stream: bool = False, cancellation_handler=None
+        stream: bool = False, cancellation_handler=None, token_callback=None
     ) -> Tuple[str, Dict, Optional[str]]:
         """Edit the translation to ensure it makes sense in the target language while preserving original meaning.
 
@@ -154,6 +159,7 @@ class Translator:
             model: The model to use for editing
             stream: Whether to stream responses (default: False)
             cancellation_handler: Optional handler to check for cancellation requests
+            token_callback: Optional callback function called for each token during streaming
 
         Returns:
             Tuple containing:
@@ -213,6 +219,10 @@ class Translator:
                         full_response += content
                         # Count tokens in chunk.choices[0].delta.content
                         usage["completion_tokens"] += 1  # This is a rough estimate
+                        
+                        # Call the token callback if provided
+                        if token_callback:
+                            token_callback(content)
                 
                 # Estimate prompt tokens based on input length
                 from translator.token_counter import TokenCounter
@@ -260,7 +270,7 @@ class Translator:
 
     def critique_translation(
         self, translated_text: str, original_text: str, target_language: str, model: str,
-        stream: bool = False, cancellation_handler=None
+        stream: bool = False, cancellation_handler=None, token_callback=None
     ) -> Tuple[str, Dict, str, Optional[str]]:
         """Aggressively critique the translation against the original text.
 
@@ -271,6 +281,7 @@ class Translator:
             model: The model to use for critique
             stream: Whether to stream responses (default: False)
             cancellation_handler: Optional handler to check for cancellation requests
+            token_callback: Optional callback function called for each token during streaming
 
         Returns:
             Tuple containing:
@@ -329,6 +340,10 @@ class Translator:
                         full_response += content
                         # Count tokens in chunk.choices[0].delta.content
                         usage["completion_tokens"] += 1  # This is a rough estimate
+                        
+                        # Call the token callback if provided
+                        if token_callback:
+                            token_callback(content)
                 
                 # Estimate prompt tokens based on input length
                 from translator.token_counter import TokenCounter
@@ -386,6 +401,7 @@ class Translator:
         model: str,
         stream: bool = False,
         cancellation_handler=None,
+        token_callback=None,
     ) -> Tuple[str, Dict, Optional[str]]:
         """Apply critique feedback to improve the translation.
 
@@ -397,6 +413,7 @@ class Translator:
             model: The model to use for applying feedback
             stream: Whether to stream responses (default: False)
             cancellation_handler: Optional handler to check for cancellation requests
+            token_callback: Optional callback function called for each token during streaming
 
         Returns:
             Tuple containing:
@@ -456,6 +473,10 @@ class Translator:
                         full_response += content
                         # Count tokens in chunk.choices[0].delta.content
                         usage["completion_tokens"] += 1  # This is a rough estimate
+                        
+                        # Call the token callback if provided
+                        if token_callback:
+                            token_callback(content)
                 
                 # Estimate prompt tokens based on input length
                 from translator.token_counter import TokenCounter
@@ -509,6 +530,7 @@ class Translator:
         model: str,
         stream: bool = False,
         cancellation_handler=None,
+        token_callback=None,
     ) -> Tuple[Dict, Dict, Optional[str]]:
         """Translate specified fields in frontmatter.
 
@@ -519,6 +541,7 @@ class Translator:
             model: The model to use for translation
             stream: Whether to stream responses (default: False)
             cancellation_handler: Optional handler to check for cancellation requests
+            token_callback: Optional callback function called for each token during streaming
 
         Returns:
             Tuple containing:
@@ -577,6 +600,10 @@ class Translator:
                         full_response += content
                         # Count tokens in chunk.choices[0].delta.content
                         usage["completion_tokens"] += 1  # This is a rough estimate
+                        
+                        # Call the token callback if provided
+                        if token_callback:
+                            token_callback(content)
                 
                 # Estimate prompt tokens based on input length
                 from translator.token_counter import TokenCounter

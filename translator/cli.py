@@ -6,6 +6,7 @@ import argparse
 import os
 import signal
 import sys
+import time
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -13,8 +14,11 @@ import frontmatter
 import openai
 from dotenv import load_dotenv
 from rich.console import Console
+from rich.live import Live
 from rich.markup import escape
+from rich.panel import Panel
 from rich.table import Table
+from rich.text import Text
 
 from translator.config import ModelConfig
 from translator.cost import CostEstimator
@@ -80,6 +84,99 @@ class CancellationHandler:
         
 # Create a global cancellation handler instance
 cancellation = CancellationHandler()
+
+
+class StreamingTokenDisplay:
+    """Display for streaming tokens with real-time counter.
+    
+    This class provides a live UI that shows:
+    1. Token count as they arrive
+    2. Estimated tokens per second
+    3. Progress indicator
+    """
+    
+    def __init__(self, operation_name: str, model: str):
+        """Initialize the streaming token display.
+        
+        Args:
+            operation_name: Name of the operation (e.g., "Translation", "Editing")
+            model: Model being used
+        """
+        self.operation_name = operation_name
+        self.model = model
+        self.tokens = 0
+        self.start_time = None
+        self.last_update_time = None
+        self.tokens_per_second = 0
+        self.live = None
+        
+    def start(self):
+        """Start the live display."""
+        self.start_time = time.time()
+        self.last_update_time = self.start_time
+        self.tokens = 0
+        
+        # Create a live display that will be updated as tokens arrive
+        self.live = Live(self._generate_display(), refresh_per_second=4)
+        self.live.start()
+        
+    def update(self, new_tokens: int = 1):
+        """Update the token counter and refresh the display.
+        
+        Args:
+            new_tokens: Number of new tokens to add to the counter
+        """
+        if self.live is None:
+            return
+            
+        self.tokens += new_tokens
+        current_time = time.time()
+        elapsed = current_time - self.last_update_time
+        
+        # Update tokens per second if we have elapsed at least 0.5 seconds
+        if elapsed >= 0.5:
+            self.tokens_per_second = self.tokens / (current_time - self.start_time)
+            self.last_update_time = current_time
+            
+        # Update the live display
+        self.live.update(self._generate_display())
+        
+    def stop(self):
+        """Stop the live display."""
+        if self.live is not None:
+            self.live.stop()
+            self.live = None
+            
+    def _generate_display(self):
+        """Generate the display renderables.
+        
+        Returns:
+            A Panel containing the token count and statistics
+        """
+        elapsed = time.time() - self.start_time if self.start_time else 0
+        
+        # Create a text with token information
+        text = Text()
+        text.append(f"{self.operation_name} with model: ", style="bright_white")
+        text.append(f"{self.model}\n", style="cyan")
+        text.append("Tokens: ", style="bright_white")
+        text.append(f"{self.tokens:,}", style="green bold")
+        
+        if elapsed > 1.0:
+            text.append("\nSpeed: ", style="bright_white")
+            text.append(f"{self.tokens_per_second:.1f} tokens/sec", style="yellow")
+            text.append("\nElapsed: ", style="bright_white")
+            text.append(f"{elapsed:.1f}s", style="yellow")
+        
+        # Create a panel with the text
+        panel = Panel(
+            text,
+            title=f"[bold cyan]{self.operation_name} Progress[/]",
+            border_style="blue",
+            padding=(1, 2)
+        )
+        
+        return panel
 
 
 class TranslatorCLI:
@@ -500,17 +597,35 @@ class TranslatorCLI:
                 use_streaming = True
                 
                 if use_streaming:
-                    # Custom progress display for streaming responses
-                    console.print("[dim]Streaming frontmatter translation as it arrives...[/]")
+                    # Create token display
+                    token_display = StreamingTokenDisplay("Frontmatter Translation", model)
+                    
+                    # Define a callback to update the token counter
+                    def token_callback(_token):  # pylint: disable=unused-argument
+                        token_display.update()
+                    
+                    # Start the token display
+                    token_display.start()
                     
                     # Pass cancellation handler and reset it before starting
                     cancellation.reset()
                     translated_frontmatter, frontmatter_usage, error_msg = (
                         translator.translate_frontmatter(
-                            frontmatter_data, translatable_fields, target_language, model, stream=True,
-                            cancellation_handler=cancellation
+                            frontmatter_data, 
+                            translatable_fields, 
+                            target_language, 
+                            model, 
+                            stream=True,
+                            cancellation_handler=cancellation,
+                            token_callback=token_callback
                         )
                     )
+                    
+                    # Stop the token display
+                    token_display.stop()
+                    
+                    # Show final count
+                    console.print(f"[bold green]Frontmatter translation complete![/] Generated [bold]{frontmatter_usage['completion_tokens']:,}[/] tokens")
                 else:
                     # Translate frontmatter fields without streaming
                     translated_frontmatter, frontmatter_usage, error_msg = (
@@ -559,15 +674,35 @@ class TranslatorCLI:
         use_streaming = True
         
         if use_streaming:
-            # Custom progress display for streaming responses
+            # Custom progress display with token counter
             console.print("[bold green]Translating...[/]")
-            console.print("[dim]Streaming tokens as they arrive...[/]")
+            
+            # Create token display
+            token_display = StreamingTokenDisplay("Translation", model)
+            
+            # Define a callback to update the token counter
+            def token_callback(_token):  # pylint: disable=unused-argument
+                token_display.update()
+            
+            # Start the token display
+            token_display.start()
             
             # Pass cancellation handler and reset it before starting
             cancellation.reset()
             translated_content, translation_usage, error_msg = translator.translate_text(
-                content_for_translation, target_language, model, stream=True, cancellation_handler=cancellation
+                content_for_translation, 
+                target_language, 
+                model, 
+                stream=True, 
+                cancellation_handler=cancellation,
+                token_callback=token_callback
             )
+            
+            # Stop the token display
+            token_display.stop()
+            
+            # Show final count
+            console.print(f"[bold green]Translation complete![/] Received [bold]{translation_usage['completion_tokens']:,}[/] tokens")
         else:
             # Traditional progress spinner (non-streaming)
             with Progress(
@@ -630,15 +765,33 @@ class TranslatorCLI:
             use_streaming = True
             
             if use_streaming:
-                # Custom progress display for streaming responses
-                console.print("[dim]Streaming edits as they arrive...[/]")
+                # Create token display
+                token_display = StreamingTokenDisplay("Editing", model)
+                
+                # Define a callback to update the token counter
+                def token_callback(_token):  # pylint: disable=unused-argument
+                    token_display.update()
+                
+                # Start the token display
+                token_display.start()
                 
                 # Pass cancellation handler and reset it before starting
                 cancellation.reset()
                 translated_content, edit_usage, error_msg = translator.edit_translation(
-                    translated_content, content_for_translation, target_language, model, stream=True,
-                    cancellation_handler=cancellation
+                    translated_content, 
+                    content_for_translation, 
+                    target_language, 
+                    model, 
+                    stream=True,
+                    cancellation_handler=cancellation,
+                    token_callback=token_callback
                 )
+                
+                # Stop the token display
+                token_display.stop()
+                
+                # Show final count
+                console.print(f"[bold green]Editing complete![/] Processed [bold]{edit_usage['completion_tokens']:,}[/] tokens")
             else:
                 # Use Rich Progress bar for editing (non-streaming)
                 with Progress(
@@ -714,8 +867,15 @@ class TranslatorCLI:
                 use_streaming = True
                 
                 if use_streaming:
-                    # Custom progress display for streaming responses
-                    console.print("[dim]Streaming critique as it arrives...[/]")
+                    # Create token display
+                    token_display = StreamingTokenDisplay("Critique Generation", model)
+                    
+                    # Define a callback to update the token counter
+                    def token_callback(_token):  # pylint: disable=unused-argument
+                        token_display.update()
+                    
+                    # Start the token display
+                    token_display.start()
                     
                     # Pass cancellation handler and reset it before starting
                     cancellation.reset()
@@ -726,9 +886,16 @@ class TranslatorCLI:
                             target_language,
                             model,
                             stream=True,
-                            cancellation_handler=cancellation
+                            cancellation_handler=cancellation,
+                            token_callback=token_callback
                         )
                     )
+                    
+                    # Stop the token display
+                    token_display.stop()
+                    
+                    # Show final count
+                    console.print(f"[bold green]Critique complete![/] Generated [bold]{loop_critique_usage['completion_tokens']:,}[/] tokens")
                 else:
                     # Use Rich Progress bar for critique generation (non-streaming)
                     with Progress(
@@ -785,8 +952,15 @@ class TranslatorCLI:
                 use_streaming = True
                 
                 if use_streaming:
-                    # Custom progress display for streaming responses
-                    console.print("[dim]Streaming feedback application results as they arrive...[/]")
+                    # Create token display
+                    token_display = StreamingTokenDisplay("Critique Application", model)
+                    
+                    # Define a callback to update the token counter
+                    def token_callback(_token):  # pylint: disable=unused-argument
+                        token_display.update()
+                    
+                    # Start the token display
+                    token_display.start()
                     
                     # Pass cancellation handler and reset it before starting
                     cancellation.reset()
@@ -798,9 +972,16 @@ class TranslatorCLI:
                             target_language,
                             model,
                             stream=True,
-                            cancellation_handler=cancellation
+                            cancellation_handler=cancellation,
+                            token_callback=token_callback
                         )
                     )
+                    
+                    # Stop the token display
+                    token_display.stop()
+                    
+                    # Show final count
+                    console.print(f"[bold green]Critique application complete![/] Generated [bold]{loop_feedback_usage['completion_tokens']:,}[/] tokens")
                 else:
                     # Use Rich Progress bar for applying feedback (non-streaming)
                     with Progress(
