@@ -22,6 +22,7 @@ from translator.frontmatter_handler import FrontmatterHandler
 from translator.log_interpreter import LogInterpreter
 from translator.token_counter import TokenCounter
 from translator.translator import Translator
+from rich.progress import Progress, SpinnerColumn, TextColumn
 
 console = Console()
 
@@ -435,12 +436,21 @@ class TranslatorCLI:
                 FrontmatterHandler.get_translatable_frontmatter_fields(frontmatter_data)
             )
             if translatable_fields:
+                # Display UI message
+                console.print(
+                    f"[bold]Translating frontmatter fields:[/] {', '.join(translatable_fields)}"
+                )
+                
                 # Translate frontmatter fields
-                translated_frontmatter, frontmatter_usage = (
+                translated_frontmatter, frontmatter_usage, error_msg = (
                     translator.translate_frontmatter(
                         frontmatter_data, translatable_fields, target_language, model
                     )
                 )
+                
+                # Handle any error
+                if error_msg:
+                    console.print(f"[bold yellow]Warning:[/] {error_msg}")
 
                 # Add to total usage
                 total_usage["prompt_tokens"] += frontmatter_usage["prompt_tokens"]
@@ -474,10 +484,25 @@ class TranslatorCLI:
         Returns:
             Tuple containing: translated_content, translation_usage
         """
-        # Perform translation of main content and get token usage
-        translated_content, translation_usage = translator.translate_text(
-            content_for_translation, target_language, model
-        )
+        # Use Rich Progress bar for translation
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[bold green]Translating...[/]"),
+            transient=True,
+        ) as progress:
+            progress.add_task("translating", total=None)
+            
+            # Perform translation of main content and get token usage
+            translated_content, translation_usage, error_msg = translator.translate_text(
+                content_for_translation, target_language, model
+            )
+        
+        # Handle any error
+        if error_msg:
+            console.print(f"[bold red]Error:[/] {error_msg}")
+            sys.exit(1)
+            
+        # Update usage tracking
         total_usage["prompt_tokens"] += translation_usage["prompt_tokens"]
         total_usage["completion_tokens"] += translation_usage["completion_tokens"]
         total_usage["total_tokens"] += translation_usage["total_tokens"]
@@ -515,9 +540,25 @@ class TranslatorCLI:
         # Perform editing if not skipped
         if not skip_edit:
             console.print("[bold]Editing translation for fluency and accuracy...[/]")
-            translated_content, edit_usage = translator.edit_translation(
-                translated_content, content_for_translation, target_language, model
-            )
+            
+            # Use Rich Progress bar for editing
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[bold green]Editing translation...[/]"),
+                transient=True,
+            ) as progress:
+                progress.add_task("editing", total=None)
+                
+                # Perform editing
+                translated_content, edit_usage, error_msg = translator.edit_translation(
+                    translated_content, content_for_translation, target_language, model
+                )
+            
+            # Handle any error
+            if error_msg:
+                console.print(f"[bold yellow]Warning:[/] {error_msg}")
+                
+            # Update usage tracking
             total_usage["prompt_tokens"] += edit_usage["prompt_tokens"]
             total_usage["completion_tokens"] += edit_usage["completion_tokens"]
             total_usage["total_tokens"] += edit_usage["total_tokens"]
@@ -569,14 +610,29 @@ class TranslatorCLI:
                 console.print(
                     f"[bold]Critique loop {loop+1}/{critique_loops}: Generating critique...[/]"
                 )
-                _, loop_critique_usage, critique_feedback = (
-                    translator.critique_translation(
-                        translated_content,
-                        content_for_translation,
-                        target_language,
-                        model,
+                
+                # Use Rich Progress bar for critique generation
+                with Progress(
+                    SpinnerColumn(),
+                    TextColumn("[bold red]Generating critique...[/]"),
+                    transient=True,
+                ) as progress:
+                    progress.add_task("critiquing", total=None)
+                    
+                    # Generate critique
+                    _, loop_critique_usage, critique_feedback, error_msg = (
+                        translator.critique_translation(
+                            translated_content,
+                            content_for_translation,
+                            target_language,
+                            model,
+                        )
                     )
-                )
+                
+                # Handle any critique error
+                if error_msg:
+                    console.print(f"[bold yellow]Warning:[/] {error_msg}")
+                    continue
 
                 # Add usage to the running total
                 total_usage["prompt_tokens"] += loop_critique_usage["prompt_tokens"]
@@ -604,15 +660,29 @@ class TranslatorCLI:
                 console.print(
                     f"[bold]Critique loop {loop+1}/{critique_loops}: Applying critique feedback...[/]"
                 )
-                translated_content, loop_feedback_usage = (
-                    translator.apply_critique_feedback(
-                        translated_content,
-                        content_for_translation,
-                        critique_feedback,
-                        target_language,
-                        model,
+                
+                # Use Rich Progress bar for applying feedback
+                with Progress(
+                    SpinnerColumn(),
+                    TextColumn("[bold blue]Applying critique feedback...[/]"),
+                    transient=True,
+                ) as progress:
+                    progress.add_task("applying_feedback", total=None)
+                    
+                    # Apply feedback
+                    translated_content, loop_feedback_usage, error_msg = (
+                        translator.apply_critique_feedback(
+                            translated_content,
+                            content_for_translation,
+                            critique_feedback,
+                            target_language,
+                            model,
+                        )
                     )
-                )
+                
+                # Handle any feedback application error
+                if error_msg:
+                    console.print(f"[bold yellow]Warning:[/] {error_msg}")
 
                 # Add usage to the running total
                 total_usage["prompt_tokens"] += loop_feedback_usage["prompt_tokens"]

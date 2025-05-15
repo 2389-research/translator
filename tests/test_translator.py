@@ -68,12 +68,13 @@ def test_translate_text(translator_instance):
     target_language = "Spanish"
     model = "gpt-4"
 
-    translated_text, usage = translator_instance.translate_text(
+    translated_text, usage, error_msg = translator_instance.translate_text(
         text, target_language, model
     )
 
     # Verify results
     assert translated_text == "Texto traducido al español."
+    assert error_msg is None
     assert usage["prompt_tokens"] == 10
     assert usage["completion_tokens"] == 20
     assert usage["total_tokens"] == 30
@@ -105,9 +106,18 @@ def test_translate_text_error(translator_instance):
         "API Error"
     )
 
-    # Call the method and expect it to raise SystemExit
-    with pytest.raises(SystemExit):
-        translator_instance.translate_text("Text to translate", "Spanish", "gpt-4")
+    # Call the method and check for error message
+    translated_text, usage, error_msg = translator_instance.translate_text(
+        "Text to translate", "Spanish", "gpt-4"
+    )
+    
+    # Should return None for text, empty usage stats, and error message
+    assert translated_text is None
+    assert usage["prompt_tokens"] == 0
+    assert usage["completion_tokens"] == 0
+    assert usage["total_tokens"] == 0
+    assert error_msg is not None
+    assert "API Error" in error_msg
 
 
 def test_edit_translation(translator_instance):
@@ -122,7 +132,7 @@ def test_edit_translation(translator_instance):
     target_language = "Spanish"
     model = "gpt-4"
 
-    edited_text, usage = translator_instance.edit_translation(
+    edited_text, usage, error_msg = translator_instance.edit_translation(
         translated_text, original_text, target_language, model
     )
 
@@ -162,7 +172,7 @@ def test_edit_translation_with_o3_model(translator_instance):
     target_language = "Spanish"
     model = "o3"
 
-    edited_text, usage = translator_instance.edit_translation(
+    edited_text, usage, error_msg = translator_instance.edit_translation(
         translated_text, original_text, target_language, model
     )
 
@@ -184,7 +194,7 @@ def test_edit_translation_error(translator_instance):
 
     # Call the method - should return original text and empty usage stats
     translated_text = "Texto original."
-    result, usage = translator_instance.edit_translation(
+    result, usage, error_msg = translator_instance.edit_translation(
         translated_text, "Original text", "Spanish", "gpt-4"
     )
 
@@ -193,6 +203,8 @@ def test_edit_translation_error(translator_instance):
     assert usage["prompt_tokens"] == 0
     assert usage["completion_tokens"] == 0
     assert usage["total_tokens"] == 0
+    assert error_msg is not None
+    assert "API Error" in error_msg
 
 
 def test_critique_translation(translator_instance):
@@ -208,7 +220,7 @@ def test_critique_translation(translator_instance):
     target_language = "Spanish"
     model = "gpt-4"
 
-    result_text, usage, feedback = translator_instance.critique_translation(
+    result_text, usage, feedback, error_msg = translator_instance.critique_translation(
         translated_text, original_text, target_language, model
     )
 
@@ -250,7 +262,7 @@ def test_critique_translation_with_o3_model(translator_instance):
     target_language = "Spanish"
     model = "o3"
 
-    _, _, feedback = translator_instance.critique_translation(
+    _, _, feedback, error_msg = translator_instance.critique_translation(
         translated_text, original_text, target_language, model
     )
 
@@ -272,7 +284,7 @@ def test_critique_translation_error(translator_instance):
 
     # Call the method - should return original text, empty usage stats, and empty critique
     translated_text = "Texto original."
-    result, usage, critique = translator_instance.critique_translation(
+    result, usage, critique, error_msg = translator_instance.critique_translation(
         translated_text, "Original text", "Spanish", "gpt-4"
     )
 
@@ -282,6 +294,8 @@ def test_critique_translation_error(translator_instance):
     assert usage["completion_tokens"] == 0
     assert usage["total_tokens"] == 0
     assert critique == ""
+    assert error_msg is not None
+    assert "API Error" in error_msg
 
 
 def test_apply_critique_feedback(translator_instance):
@@ -298,7 +312,7 @@ def test_apply_critique_feedback(translator_instance):
     target_language = "Spanish"
     model = "gpt-4"
 
-    result, usage = translator_instance.apply_critique_feedback(
+    result, usage, error_msg = translator_instance.apply_critique_feedback(
         translated_text, original_text, critique, target_language, model
     )
 
@@ -338,7 +352,7 @@ def test_apply_critique_feedback_with_o3_model(translator_instance):
     target_language = "Spanish"
     model = "o3"
 
-    result, _ = translator_instance.apply_critique_feedback(
+    result, _, error_msg = translator_instance.apply_critique_feedback(
         translated_text, original_text, critique, target_language, model
     )
 
@@ -360,7 +374,7 @@ def test_apply_critique_feedback_error(translator_instance):
 
     # Call the method - should return original text and empty usage stats
     translated_text = "Texto original."
-    result, usage = translator_instance.apply_critique_feedback(
+    result, usage, error_msg = translator_instance.apply_critique_feedback(
         translated_text, "Original text", "Critique", "Spanish", "gpt-4"
     )
 
@@ -369,6 +383,8 @@ def test_apply_critique_feedback_error(translator_instance):
     assert usage["prompt_tokens"] == 0
     assert usage["completion_tokens"] == 0
     assert usage["total_tokens"] == 0
+    assert error_msg is not None
+    assert "API Error" in error_msg
 
 
 def test_translate_frontmatter(translator_instance):
@@ -394,7 +410,7 @@ description: Descripción traducida
     target_language = "Spanish"
     model = "gpt-4"
 
-    result, usage = translator_instance.translate_frontmatter(
+    result, usage, error_msg = translator_instance.translate_frontmatter(
         frontmatter_data, fields, target_language, model
     )
 
@@ -430,7 +446,7 @@ def test_translate_frontmatter_no_fields(translator_instance):
     }
     fields = []
 
-    result, usage = translator_instance.translate_frontmatter(
+    result, usage, error_msg = translator_instance.translate_frontmatter(
         frontmatter_data, fields, "Spanish", "gpt-4"
     )
 
@@ -480,7 +496,7 @@ def test_translate_frontmatter_pattern_matching(mock_re_search, translator_insta
     }
     fields = ["title", "description"]
 
-    result, _ = translator_instance.translate_frontmatter(
+    result, _, error_msg = translator_instance.translate_frontmatter(
         frontmatter_data, fields, "Spanish", "gpt-4"
     )
 
@@ -500,7 +516,7 @@ def test_translate_frontmatter_error(translator_instance):
     frontmatter_data = {"title": "Original Title"}
     fields = ["title"]
 
-    result, usage = translator_instance.translate_frontmatter(
+    result, usage, error_msg = translator_instance.translate_frontmatter(
         frontmatter_data, fields, "Spanish", "gpt-4"
     )
 
@@ -509,3 +525,5 @@ def test_translate_frontmatter_error(translator_instance):
     assert usage["prompt_tokens"] == 0
     assert usage["completion_tokens"] == 0
     assert usage["total_tokens"] == 0
+    assert error_msg is not None
+    assert "API Error" in error_msg
