@@ -93,6 +93,7 @@ class StreamingTokenDisplay:
     1. Token count as they arrive
     2. Estimated tokens per second
     3. Progress indicator
+    4. Elapsed time and estimated time remaining
     """
     
     def __init__(self, operation_name: str, model: str):
@@ -120,7 +121,8 @@ class StreamingTokenDisplay:
         self.tokens = 0
         
         # Create a live display that will be updated as tokens arrive
-        self.live = Live(self._generate_display(), refresh_per_second=4)
+        # Use auto_refresh=False to prevent screen artifacting
+        self.live = Live(self._generate_display(), refresh_per_second=4, auto_refresh=False)
         self.live.start()
         
     def update(self, new_tokens: int = 1):
@@ -143,7 +145,9 @@ class StreamingTokenDisplay:
             self.last_update_time = current_time
             
         # Update the live display
-        self.live.update(self._generate_display())
+        # Generate display once and use it to prevent flickering
+        display = self._generate_display()
+        self.live.update(display)
         
     def stop(self):
         """
