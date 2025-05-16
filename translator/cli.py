@@ -96,11 +96,12 @@ class StreamingTokenDisplay:
     """
     
     def __init__(self, operation_name: str, model: str):
-        """Initialize the streaming token display.
+        """
+        Initializes a live token display for a streaming operation.
         
         Args:
-            operation_name: Name of the operation (e.g., "Translation", "Editing")
-            model: Model being used
+            operation_name: The name of the current operation (e.g., "Translation", "Editing").
+            model: The model used for the operation.
         """
         self.operation_name = operation_name
         self.model = model
@@ -111,7 +112,9 @@ class StreamingTokenDisplay:
         self.live = None
         
     def start(self):
-        """Start the live display."""
+        """
+        Starts the live token count display and initializes timing for streaming operations.
+        """
         self.start_time = time.time()
         self.last_update_time = self.start_time
         self.tokens = 0
@@ -121,10 +124,11 @@ class StreamingTokenDisplay:
         self.live.start()
         
     def update(self, new_tokens: int = 1):
-        """Update the token counter and refresh the display.
+        """
+        Increments the token count and updates the live streaming token display.
         
         Args:
-            new_tokens: Number of new tokens to add to the counter
+            new_tokens: The number of tokens to add to the current count.
         """
         if self.live is None:
             return
@@ -142,16 +146,18 @@ class StreamingTokenDisplay:
         self.live.update(self._generate_display())
         
     def stop(self):
-        """Stop the live display."""
+        """
+        Stops the live token display and cleans up the display instance.
+        """
         if self.live is not None:
             self.live.stop()
             self.live = None
             
     def get_elapsed_time(self):
-        """Get the elapsed time formatted as a string.
+        """
+        Returns the elapsed time since the display started as a formatted string.
         
-        Returns:
-            Formatted elapsed time string
+        If the timer has not started, returns "0s".
         """
         if self.start_time is None:
             return "0s"
@@ -160,13 +166,11 @@ class StreamingTokenDisplay:
         return self._format_time(elapsed)
             
     def _format_time(self, seconds):
-        """Format seconds into minutes:seconds format.
+        """
+        Converts a duration in seconds to a human-readable time string.
         
-        Args:
-            seconds: Time in seconds
-            
         Returns:
-            Formatted time string as 'M:SS' or 'HH:MM:SS' for longer durations
+            A formatted string in 'S.s', 'M:SS', or 'H:MM:SS' format depending on duration.
         """
         if seconds < 60:
             return f"{seconds:.1f}s"
@@ -181,10 +185,12 @@ class StreamingTokenDisplay:
             return f"{hours}:{minutes:02d}:{seconds:02d}"
     
     def _generate_display(self):
-        """Generate the display renderables.
+        """
+        Generates a Rich Panel displaying live token statistics for the current operation.
         
         Returns:
-            A Panel containing the token count and statistics
+            A Panel object showing the operation name, model, elapsed time, token count,
+            tokens per second, and estimated remaining time if applicable.
         """
         elapsed = time.time() - self.start_time if self.start_time else 0
         formatted_time = self._format_time(elapsed)
@@ -612,17 +618,20 @@ class TranslatorCLI:
         target_language: str,
         model: str,
     ) -> Tuple[Optional[Dict], Dict, Dict]:
-        """Translate frontmatter if present.
-
+        """
+        Translates frontmatter fields if present and returns the translated data and token usage.
+        
+        If frontmatter exists and contains translatable fields, translates those fields using the provided Translator instance, optionally displaying a live token count and supporting cancellation. Returns the translated frontmatter, token usage for the frontmatter translation, and cumulative usage.
+        
         Args:
-            has_frontmatter: Whether the input has frontmatter
-            frontmatter_data: Frontmatter data if present
-            translator: Translator instance
-            target_language: Target language for translation
-            model: Model to use for translation
-
+            has_frontmatter: Indicates if the input contains frontmatter.
+            frontmatter_data: The frontmatter data to translate, if present.
+            translator: The Translator instance used for translation.
+            target_language: The language to translate the frontmatter into.
+            model: The model to use for translation.
+        
         Returns:
-            Tuple containing: translated_frontmatter, frontmatter_usage, total_usage
+            A tuple containing the translated frontmatter (or None if not present), a dictionary of token usage for the frontmatter translation, and a dictionary of total token usage.
         """
         # Initialize usage tracking
         total_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
@@ -654,6 +663,11 @@ class TranslatorCLI:
                     
                     # Define a callback to update the token counter
                     def token_callback(_token):  # pylint: disable=unused-argument
+                        """
+                        Updates the streaming token display during token generation.
+                        
+                        This callback is intended to be passed to streaming translation or completion methods to refresh the live token count display each time a new token is received.
+                        """
                         token_display.update()
                     
                     # Start the token display
@@ -711,17 +725,19 @@ class TranslatorCLI:
         model: str,
         total_usage: Dict,
     ) -> Tuple[str, Dict]:
-        """Translate main content and update usage tracking.
-
+        """
+        Translates the main content using the specified model and updates token usage tracking.
+        
         Args:
-            content_for_translation: Content to translate
-            translator: Translator instance
-            target_language: Target language for translation
-            model: Model to use for translation
-            total_usage: Current token usage to update
-
+            content_for_translation: The text content to be translated.
+            target_language: The language to translate the content into.
+            model: The OpenAI model to use for translation.
+            total_usage: Dictionary tracking cumulative token usage, updated in place.
+        
         Returns:
-            Tuple containing: translated_content, translation_usage
+            A tuple containing the translated content and a dictionary of token usage for this translation step.
+        
+        Exits the program if a translation error occurs.
         """
         # Use streaming for improved user experience
         use_streaming = True
@@ -735,6 +751,12 @@ class TranslatorCLI:
             
             # Define a callback to update the token counter
             def token_callback(_token):  # pylint: disable=unused-argument
+                """
+                Updates the streaming token display during token generation.
+                
+                This callback is intended to be passed to streaming translation operations to refresh
+                the live token count display each time a new token is received.
+                """
                 token_display.update()
             
             # Start the token display
@@ -794,19 +816,21 @@ class TranslatorCLI:
         model: str,
         total_usage: Dict,
     ) -> Tuple[str, Dict]:
-        """Edit translated content if not skipped and update usage tracking.
-
+        """
+        Edits the translated content for fluency and accuracy unless editing is skipped.
+        
+        If editing is performed, displays a live token count during the process and updates token usage statistics. Handles user cancellation and displays warnings if errors occur.
+        
         Args:
-            skip_edit: Whether to skip the editing step
-            translated_content: Translated content to edit
-            content_for_translation: Original content
-            translator: Translator instance
-            target_language: Target language for translation
-            model: Model to use for translation
-            total_usage: Current token usage to update
-
+            skip_edit: If True, skips the editing step.
+            translated_content: The content to be edited.
+            content_for_translation: The original untranslated content.
+            target_language: The language into which the content is being translated.
+            model: The model used for editing.
+            total_usage: Dictionary tracking cumulative token usage, updated in place.
+        
         Returns:
-            Tuple containing: edited_content, edit_usage
+            A tuple containing the (possibly edited) content and a dictionary of token usage for the editing step.
         """
         # Initialize edit usage tracking
         edit_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
@@ -824,6 +848,11 @@ class TranslatorCLI:
                 
                 # Define a callback to update the token counter
                 def token_callback(_token):  # pylint: disable=unused-argument
+                    """
+                    Updates the streaming token display during token generation.
+                    
+                    Intended as a callback for streaming token events to refresh the live token count UI.
+                    """
                     token_display.update()
                 
                 # Start the token display
@@ -884,21 +913,27 @@ class TranslatorCLI:
         model: str,
         total_usage: Dict,
     ) -> Tuple[str, Dict, Dict, List[Dict], List[Dict]]:
-        """Perform critique loops if requested.
-
+        """
+        Performs one or more critique and revision loops on translated content.
+        
+        If enabled, iteratively generates critiques of the translated content and applies feedback to improve it, updating token usage statistics for each step. Stores all critiques in the translator's log for later reference.
+        
         Args:
-            do_critique: Whether to perform critique
-            critique_loops: Number of critique loops to perform
-            translated_content: Translated content to critique
-            content_for_translation: Original content
-            translator: Translator instance
-            target_language: Target language for translation
-            model: Model to use for translation
-            total_usage: Current token usage to update
-
+            do_critique: Whether to perform critique and revision loops.
+            critique_loops: Number of critique/revision cycles to perform.
+            translated_content: The content to be critiqued and improved.
+            content_for_translation: The original source content.
+            target_language: The language into which the content is being translated.
+            model: The model used for critique and feedback.
+            total_usage: Dictionary tracking cumulative token usage.
+        
         Returns:
-            Tuple containing: improved_content, critique_usage, feedback_usage,
-            critique_usages, feedback_usages
+            A tuple containing:
+                - The improved content after all critique loops.
+                - Token usage for the last critique step.
+                - Token usage for the last feedback application.
+                - List of token usage dictionaries for each critique step.
+                - List of token usage dictionaries for each feedback application.
         """
         # Initialize critique usage tracking
         critique_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
@@ -927,6 +962,12 @@ class TranslatorCLI:
                     
                     # Define a callback to update the token counter
                     def token_callback(_token):  # pylint: disable=unused-argument
+                        """
+                        Updates the streaming token display during token generation.
+                        
+                        This callback is intended to be passed to streaming translation operations to refresh
+                        the live token count display each time a new token is received.
+                        """
                         token_display.update()
                     
                     # Start the token display
@@ -1013,6 +1054,9 @@ class TranslatorCLI:
                     
                     # Define a callback to update the token counter
                     def token_callback(_token):  # pylint: disable=unused-argument
+                        """
+                        Updates the streaming token display when a new token is received during streaming operations.
+                        """
                         token_display.update()
                     
                     # Start the token display
