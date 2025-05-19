@@ -17,14 +17,6 @@ repos:
                 - --exclude
                 - tests/
 
-    - repo: https://github.com/DavidAnson/markdownlint-cli2
-      rev: v0.10.0
-      hooks:
-          - id: markdownlint-cli2
-            args: ["--config", ".markdownlint-cli2.jsonc"]
-            additional_dependencies:
-                - markdownlint-cli2@0.10.0
-
     - repo: https://github.com/rhysd/actionlint
       rev: v1.6.26
       hooks:

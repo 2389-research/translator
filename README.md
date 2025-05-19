@@ -17,22 +17,100 @@ Key features include:
 
 ## How to Use
 
-### Installation
+### Installation Options
 
-1. Clone the repository
+#### Option 1: Install directly with uv (recommended)
 
 ```bash
-git clone https://github.com/2389-research/translator.git
-cd translator
+# Install the package directly from GitHub
+uv tool install git+https://github.com/2389-research/translator
 ```
 
-2. Configure your API key
+Then you can use the command:
 
 ```bash
-# Copy the example environment file
-cp .env.example .env
+translator --help
+```
 
-# Edit the .env file to add your OpenAI API key
+#### Option 2: Clone and install locally
+
+```bash
+# Clone the repository
+git clone https://github.com/2389-research/translator.git
+cd translator
+
+# Install the package
+uv tool install .
+```
+
+### Configuration
+
+The translator requires an OpenAI API key to function. The easiest way to configure it is using the interactive setup:
+
+```bash
+translator config
+```
+
+This will walk you through setting up your configuration, including:
+- Choosing where to store your configuration (.env files)
+- Setting your OpenAI API key
+- Configuring optional settings like default model and output directory
+
+Alternatively, you can configure manually in several ways (in order of precedence):
+
+1. **Environment variable**:
+
+```bash
+export OPENAI_API_KEY=your_openai_api_key_here
+```
+
+2. **Local .env file**:
+
+Create a `.env` file in your current directory:
+
+```bash
+echo "OPENAI_API_KEY=your_openai_api_key_here" > .env
+```
+
+3. **User configuration directory**:
+
+For persistent configuration, create a `.env` file in the `~/.translator/` directory:
+
+```bash
+# Create the configuration directory
+mkdir -p ~/.translator
+
+# Create a .env file
+echo "OPENAI_API_KEY=your_openai_api_key_here" > ~/.translator/.env
+```
+
+The first time you run the tool without a configured API key, it will offer to create this directory and a template configuration file for you.
+
+4. **Alternative configuration location**:
+
+You can also place the `.env` file in `~/.config/translator/`:
+
+```bash
+# Create the configuration directory
+mkdir -p ~/.config/translator
+
+# Create a .env file
+echo "OPENAI_API_KEY=your_openai_api_key_here" > ~/.config/translator/.env
+```
+
+#### Additional Configuration Options
+
+You can add these options to your `.env` file:
+
+```bash
+# Default model (optional, defaults to o3)
+DEFAULT_MODEL=o3
+
+# Output directory for translated files (optional)
+OUTPUT_DIR=/path/to/output/directory
+
+# Log level (optional, defaults to INFO)
+LOG_LEVEL=INFO  # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
 ```
 
 ### Basic Usage
@@ -40,7 +118,7 @@ cp .env.example .env
 Translate a file to another language:
 
 ```bash
-uv run main.py input.txt Spanish
+translator input.txt Spanish
 ```
 
 This will create a translated file named `input.es.txt` in the same directory.
@@ -48,26 +126,40 @@ This will create a translated file named `input.es.txt` in the same directory.
 ### Command Options
 
 ```bash
+# Configure the translator interactively
+translator config
+
 # Translate to French with a custom output file
-uv run main.py README.md French -o translated_readme.md
+translator README.md French -o translated_readme.md
 
 # Use a specific OpenAI model
-uv run main.py document.txt Japanese -m gpt-4o
+translator document.txt Japanese -m gpt-4o
 
 # Skip the editing step for faster processing
-uv run main.py long_document.txt German --no-edit
+translator long_document.txt German --no-edit
 
 # Skip the critique step
-uv run main.py quick_translation.txt Chinese --no-critique
+translator quick_translation.txt Chinese --no-critique
 
 # Specify number of critique-revision loops (1-5)
-uv run main.py important_document.txt Korean --critique-loops 3
+translator important_document.txt Korean --critique-loops 3
 
 # View available models and pricing
-uv run main.py --list-models
+translator --list-models
 
 # Estimate cost without translating
-uv run main.py large_document.txt Portuguese --estimate-only
+translator large_document.txt Portuguese --estimate-only
+
+# Alternatively, use the explicit translate command
+translator translate README.md French
+```
+
+### Legacy Usage (from source directory)
+
+If you're working directly in the source directory without installing the package:
+
+```bash
+uv run main.py input.txt Spanish
 ```
 
 ## Tech Info

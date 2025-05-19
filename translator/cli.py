@@ -246,17 +246,75 @@ class TranslatorCLI:
 
     @staticmethod
     def setup_openai_client() -> openai.OpenAI:
-        """Set up and return an OpenAI client."""
+        """Set up and return an OpenAI client.
+        
+        Looks for the OpenAI API key in the following locations (in order of precedence):
+        1. Environment variables
+        2. .env file in the current working directory
+        3. .env file in ~/.translator/ directory
+        4. .env file in ~/.config/translator/ directory
+        """
+        # First, try loading from the current directory
         load_dotenv()
+        
+        # If no API key yet, try user config directories
         api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            # Try ~/.translator/.env
+            home_dir = os.path.expanduser("~")
+            translator_dir = os.path.join(home_dir, ".translator")
+            env_path = os.path.join(translator_dir, ".env")
+            
+            if os.path.exists(env_path):
+                load_dotenv(env_path)
+                api_key = os.getenv("OPENAI_API_KEY")
+            
+            # If still no API key, try ~/.config/translator/.env
+            if not api_key:
+                config_dir = os.path.join(home_dir, ".config", "translator")
+                env_path = os.path.join(config_dir, ".env")
+                
+                if os.path.exists(env_path):
+                    load_dotenv(env_path)
+                    api_key = os.getenv("OPENAI_API_KEY")
 
+        # If still no API key, provide helpful error message
         if not api_key:
             console.print(
-                "[bold red]Error:[/] OPENAI_API_KEY not found in environment variables or .env file."
+                "[bold red]Error:[/] OPENAI_API_KEY not found in environment variables or .env files."
             )
             console.print(
-                "Please set your OpenAI API key in a .env file or as an environment variable."
+                "Please set your OpenAI API key in one of the following locations:"
             )
+            console.print("1. Environment variable: export OPENAI_API_KEY=your_api_key")
+            console.print("2. Current directory .env file")
+            console.print("3. ~/.translator/.env file")
+            console.print("4. ~/.config/translator/.env file")
+            
+            # Offer to create the config directory and a template .env file
+            home_dir = os.path.expanduser("~")
+            translator_dir = os.path.join(home_dir, ".translator")
+            
+            if not os.path.exists(translator_dir):
+                if TranslatorCLI.confirm("Would you like to create a config directory at ~/.translator?"):
+                    try:
+                        os.makedirs(translator_dir, exist_ok=True)
+                        env_path = os.path.join(translator_dir, ".env")
+                        with open(env_path, "w") as f:
+                            f.write("# OpenAI API Key (required)\n")
+                            f.write("OPENAI_API_KEY=your_openai_api_key_here\n\n")
+                            f.write("# Default model (optional, defaults to o3)\n")
+                            f.write("# DEFAULT_MODEL=o3\n\n")
+                            f.write("# Output directory for translated files (optional)\n")
+                            f.write("# OUTPUT_DIR=/path/to/output/directory\n\n")
+                            f.write("# Log level (optional, defaults to INFO)\n")
+                            f.write("# LOG_LEVEL=INFO  # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL\n")
+                        
+                        console.print(f"[bold green]Created config template at:[/] {env_path}")
+                        console.print("Please edit this file to add your OpenAI API key.")
+                    except Exception as e:
+                        console.print(f"[bold red]Failed to create config directory:[/] {str(e)}")
+                
             sys.exit(1)
 
         return openai.OpenAI(api_key=api_key)
@@ -401,6 +459,127 @@ class TranslatorCLI:
 
         console.print(usage_table)
 
+    @staticmethod
+    def get_config_paths() -> list:
+        """Get a list of possible configuration file paths.
+        
+        Returns:
+            A list of possible configuration file paths in order of precedence.
+        """
+        paths = []
+        
+        # Current directory
+        paths.append(os.path.join(os.getcwd(), ".env"))
+        
+        # User config directories
+        home_dir = os.path.expanduser("~")
+        paths.append(os.path.join(home_dir, ".translator", ".env"))
+        paths.append(os.path.join(home_dir, ".config", "translator", ".env"))
+        
+        return paths
+    
+    @classmethod
+    def create_config_dialog(cls) -> None:
+        """Interactive dialog to create and configure the .env file."""
+        console.print("[bold]Translator Configuration Setup[/]")
+        console.print("This will help you set up your translator configuration.")
+        
+        # Get list of possible config file paths
+        config_paths = cls.get_config_paths()
+        
+        # Present options to user
+        console.print("\n[bold]Select configuration location:[/]")
+        for i, path in enumerate(config_paths):
+            exists = os.path.exists(path)
+            status = "[green]exists[/]" if exists else "[dim]does not exist[/]"
+            console.print(f"{i+1}. {path} {status}")
+        
+        # Get user choice with input validation
+        while True:
+            choice = input("\nEnter number of preferred location (or press Enter for default ~/.translator/.env): ")
+            if not choice:
+                # Default to ~/.translator/.env
+                choice = 2
+                break
+            
+            try:
+                choice = int(choice)
+                if 1 <= choice <= len(config_paths):
+                    break
+                else:
+                    console.print(f"[red]Please enter a number between 1 and {len(config_paths)}[/]")
+            except ValueError:
+                console.print("[red]Please enter a valid number[/]")
+        
+        selected_path = config_paths[choice-1]
+        
+        # Make sure the directory exists
+        config_dir = os.path.dirname(selected_path)
+        if not os.path.exists(config_dir):
+            console.print(f"Creating directory: {config_dir}")
+            try:
+                os.makedirs(config_dir, exist_ok=True)
+            except Exception as e:
+                console.print(f"[bold red]Error creating directory:[/] {str(e)}")
+                return
+        
+        # Collect configuration values
+        config = {}
+        
+        # OpenAI API Key (required)
+        console.print("\n[bold]OpenAI API Key (required)[/]")
+        api_key = input("Enter your OpenAI API key: ").strip()
+        if not api_key:
+            console.print("[bold red]Error:[/] API key is required.")
+            return
+        config["OPENAI_API_KEY"] = api_key
+        
+        # Default model (optional)
+        console.print("\n[bold]Default Model (optional, default: o3)[/]")
+        console.print("Available models: " + ", ".join(ModelConfig.MODELS.keys()))
+        default_model = input("Enter your preferred default model (or press Enter for o3): ").strip()
+        if default_model:
+            if default_model in ModelConfig.MODELS:
+                config["DEFAULT_MODEL"] = default_model
+            else:
+                console.print(f"[yellow]Warning:[/] Unknown model '{default_model}'. Using o3.")
+        
+        # Output directory (optional)
+        console.print("\n[bold]Output Directory (optional)[/]")
+        console.print("If specified, all translations will be saved to this directory.")
+        output_dir = input("Enter output directory path (or press Enter to skip): ").strip()
+        if output_dir:
+            config["OUTPUT_DIR"] = output_dir
+        
+        # Log level (optional)
+        console.print("\n[bold]Log Level (optional, default: INFO)[/]")
+        console.print("Options: DEBUG, INFO, WARNING, ERROR, CRITICAL")
+        log_level = input("Enter log level (or press Enter for INFO): ").strip().upper()
+        if log_level and log_level in ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]:
+            config["LOG_LEVEL"] = log_level
+        
+        # Write the configuration file
+        try:
+            with open(selected_path, "w") as f:
+                for key, value in config.items():
+                    f.write(f"{key}={value}\n")
+                
+                # Add comments for documentation
+                if "DEFAULT_MODEL" not in config:
+                    f.write("\n# Default model (uncomment to change)\n# DEFAULT_MODEL=o3\n")
+                
+                if "OUTPUT_DIR" not in config:
+                    f.write("\n# Output directory (uncomment to specify)\n# OUTPUT_DIR=/path/to/output/directory\n")
+                
+                if "LOG_LEVEL" not in config:
+                    f.write("\n# Log level (uncomment to change)\n# LOG_LEVEL=INFO  # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL\n")
+            
+            console.print(f"[bold green]Configuration saved to:[/] {selected_path}")
+            console.print("[bold green]You're all set! You can now use the translator command.[/]")
+            
+        except Exception as e:
+            console.print(f"[bold red]Error saving configuration:[/] {str(e)}")
+    
     @classmethod
     def parse_arguments(cls) -> argparse.Namespace:
         """Parse command-line arguments.
@@ -411,8 +590,46 @@ class TranslatorCLI:
         parser = argparse.ArgumentParser(
             description="Translate text files to different languages using OpenAI."
         )
-        parser.add_argument("file", help="Path to the text file to translate")
-        parser.add_argument("language", help="Target language for translation")
+        
+        # Create a subparser for different commands
+        subparsers = parser.add_subparsers(dest="command", help="Commands")
+        
+        # Configure command
+        subparsers.add_parser("config", help="Configure the translator")
+        
+        # Main translation command parser (default)
+        translate_parser = subparsers.add_parser("translate", help="Translate a file (default if no command specified)")
+        translate_parser.add_argument("file", help="Path to the text file to translate")
+        translate_parser.add_argument("language", help="Target language for translation")
+        translate_parser.add_argument("-o", "--output", help="Output file path (optional)")
+        translate_parser.add_argument(
+            "-m", "--model", default="o3", help="OpenAI model to use (default: o3)"
+        )
+        translate_parser.add_argument(
+            "--no-edit",
+            action="store_true",
+            help="Skip the editing step (faster but may reduce quality)",
+        )
+        translate_parser.add_argument(
+            "--no-critique",
+            action="store_true",
+            help="Skip the aggressive critique step (faster but may reduce quality)",
+        )
+        translate_parser.add_argument(
+            "--critique-loops",
+            type=int,
+            default=4,
+            help="Number of critique-revision loops to perform (default: 4, max: 5)",
+        )
+        translate_parser.add_argument(
+            "--estimate-only",
+            action="store_true",
+            help="Only estimate tokens and cost, don't translate",
+        )
+        
+        # Add the same arguments to the main parser for backwards compatibility
+        parser.add_argument("file", nargs="?", help="Path to the text file to translate")
+        parser.add_argument("language", nargs="?", help="Target language for translation")
         parser.add_argument("-o", "--output", help="Output file path (optional)")
         parser.add_argument(
             "-m", "--model", default="o3", help="OpenAI model to use (default: o3)"
@@ -1444,6 +1661,17 @@ class TranslatorCLI:
         """Run the translator command-line interface."""
         args = cls.parse_arguments()
 
+        # Handle "config" command
+        if hasattr(args, 'command') and args.command == 'config':
+            cls.create_config_dialog()
+            return
+        
+        # Handle "list-models" command
+        if args.list_models:
+            cls.display_model_info()
+            sys.exit(0)
+
+        # Handle translation command (default)
         # Parse and validate arguments
         (
             input_file,
