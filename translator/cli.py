@@ -578,46 +578,25 @@ class TranslatorCLI:
             description="Translate text files to different languages using OpenAI."
         )
         
-        # Create a subparser for different commands
-        subparsers = parser.add_subparsers(dest="command", help="Commands")
+        # Check first argument to see if it's a known command
+        import sys
+        first_arg = sys.argv[1] if len(sys.argv) > 1 else None
         
-        # Configure command
-        subparsers.add_parser("config", help="Configure the translator")
-        
-        # Add translation command as a subcommand for explicit use
-        # (but not required since we support the same args in the main parser)
-        translate_parser = subparsers.add_parser("translate", help="Translate a file (can be omitted, as translation is the default action)")
-        translate_parser.add_argument("file", help="Path to the text file to translate")
-        translate_parser.add_argument("language", help="Target language for translation")
-        translate_parser.add_argument("-o", "--output", help="Output file path (optional)")
-        translate_parser.add_argument(
-            "-m", "--model", default="o3", help="OpenAI model to use (default: o3)"
-        )
-        translate_parser.add_argument(
-            "--no-edit",
-            action="store_true",
-            help="Skip the editing step (faster but may reduce quality)",
-        )
-        translate_parser.add_argument(
-            "--no-critique",
-            action="store_true",
-            help="Skip the aggressive critique step (faster but may reduce quality)",
-        )
-        translate_parser.add_argument(
-            "--critique-loops",
-            type=int,
-            default=4,
-            help="Number of critique-revision loops to perform (default: 4, max: 5)",
-        )
-        translate_parser.add_argument(
-            "--estimate-only",
-            action="store_true",
-            help="Only estimate tokens and cost, don't translate",
-        )
-        
-        # Main parser arguments - these make translation the default action
-        parser.add_argument("file", nargs="?", help="Path to the text file to translate")
-        parser.add_argument("language", nargs="?", help="Target language for translation")
+        # If the first argument is 'config', use command subparsers
+        if first_arg == 'config':
+            subparsers = parser.add_subparsers(dest="command")
+            config_parser = subparsers.add_parser("config", help="Configure the translator")
+            
+            # Parse args and return
+            return parser.parse_args()
+            
+        # If first argument is 'translate', remove it to make it transparent
+        if first_arg == 'translate':
+            sys.argv.pop(1)  # Remove 'translate' argument
+            
+        # Set up standard translation arguments
+        parser.add_argument("file", help="Path to the text file to translate")
+        parser.add_argument("language", help="Target language for translation")
         parser.add_argument("-o", "--output", help="Output file path (optional)")
         parser.add_argument(
             "-m", "--model", default="o3", help="OpenAI model to use (default: o3)"
@@ -649,7 +628,11 @@ class TranslatorCLI:
             help="Only estimate tokens and cost, don't translate",
         )
 
-        return parser.parse_args()
+        args = parser.parse_args()
+        
+        # Add command = None to indicate default translation
+        args.command = None
+        return args
 
     @classmethod
     def _parse_and_validate_args(
@@ -1655,11 +1638,11 @@ class TranslatorCLI:
             return
         
         # Handle "list-models" command
-        if args.list_models:
+        if hasattr(args, 'list_models') and args.list_models:
             cls.display_model_info()
             sys.exit(0)
 
-        # Handle translation (default action - with or without explicit "translate" command)
+        # Handle translation (default action)
         # Parse and validate arguments
         (
             input_file,
