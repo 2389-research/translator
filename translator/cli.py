@@ -584,8 +584,9 @@ class TranslatorCLI:
         # Configure command
         subparsers.add_parser("config", help="Configure the translator")
         
-        # Main translation command parser (default)
-        translate_parser = subparsers.add_parser("translate", help="Translate a file (default if no command specified)")
+        # Add translation command as a subcommand for explicit use
+        # (but not required since we support the same args in the main parser)
+        translate_parser = subparsers.add_parser("translate", help="Translate a file (can be omitted, as translation is the default action)")
         translate_parser.add_argument("file", help="Path to the text file to translate")
         translate_parser.add_argument("language", help="Target language for translation")
         translate_parser.add_argument("-o", "--output", help="Output file path (optional)")
@@ -614,7 +615,7 @@ class TranslatorCLI:
             help="Only estimate tokens and cost, don't translate",
         )
         
-        # Add the same arguments to the main parser for backwards compatibility
+        # Main parser arguments - these make translation the default action
         parser.add_argument("file", nargs="?", help="Path to the text file to translate")
         parser.add_argument("language", nargs="?", help="Target language for translation")
         parser.add_argument("-o", "--output", help="Output file path (optional)")
@@ -1658,7 +1659,7 @@ class TranslatorCLI:
             cls.display_model_info()
             sys.exit(0)
 
-        # Handle translation command (default)
+        # Handle translation (default action - with or without explicit "translate" command)
         # Parse and validate arguments
         (
             input_file,

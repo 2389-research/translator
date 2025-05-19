@@ -150,7 +150,7 @@ translator --list-models
 # Estimate cost without translating
 translator large_document.txt Portuguese --estimate-only
 
-# Alternatively, use the explicit translate command
+# You can also use the explicit translate command (optional)
 translator translate README.md French
 ```
 
