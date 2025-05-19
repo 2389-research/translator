@@ -305,9 +305,9 @@ class TranslatorCLI:
                             f.write("OPENAI_API_KEY=your_openai_api_key_here\n\n")
                             f.write("# Default model (optional, defaults to o3)\n")
                             f.write("# DEFAULT_MODEL=o3\n\n")
-                            f.write("# Output directory for translated files (optional)\n")
+                            f.write("# Output directory (defaults to same location as input file)\n")
                             f.write("# OUTPUT_DIR=/path/to/output/directory\n\n")
-                            f.write("# Log level (optional, defaults to INFO)\n")
+                            f.write("# Log level (defaults to INFO)\n")
                             f.write("# LOG_LEVEL=INFO  # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL\n")
                         
                         console.print(f"[bold green]Created config template at:[/] {env_path}")
@@ -545,20 +545,6 @@ class TranslatorCLI:
             else:
                 console.print(f"[yellow]Warning:[/] Unknown model '{default_model}'. Using o3.")
         
-        # Output directory (optional)
-        console.print("\n[bold]Output Directory (optional)[/]")
-        console.print("If specified, all translations will be saved to this directory.")
-        output_dir = input("Enter output directory path (or press Enter to skip): ").strip()
-        if output_dir:
-            config["OUTPUT_DIR"] = output_dir
-        
-        # Log level (optional)
-        console.print("\n[bold]Log Level (optional, default: INFO)[/]")
-        console.print("Options: DEBUG, INFO, WARNING, ERROR, CRITICAL")
-        log_level = input("Enter log level (or press Enter for INFO): ").strip().upper()
-        if log_level and log_level in ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]:
-            config["LOG_LEVEL"] = log_level
-        
         # Write the configuration file
         try:
             with open(selected_path, "w") as f:
@@ -569,11 +555,11 @@ class TranslatorCLI:
                 if "DEFAULT_MODEL" not in config:
                     f.write("\n# Default model (uncomment to change)\n# DEFAULT_MODEL=o3\n")
                 
-                if "OUTPUT_DIR" not in config:
-                    f.write("\n# Output directory (uncomment to specify)\n# OUTPUT_DIR=/path/to/output/directory\n")
+                # Include comment about output directory but don't prompt for it
+                f.write("\n# Output directory (defaults to same location as input file)\n# OUTPUT_DIR=/path/to/output/directory\n")
                 
-                if "LOG_LEVEL" not in config:
-                    f.write("\n# Log level (uncomment to change)\n# LOG_LEVEL=INFO  # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL\n")
+                # Include comment about log level but don't prompt for it
+                f.write("\n# Log level (defaults to INFO)\n# LOG_LEVEL=INFO  # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL\n")
             
             console.print(f"[bold green]Configuration saved to:[/] {selected_path}")
             console.print("[bold green]You're all set! You can now use the translator command.[/]")

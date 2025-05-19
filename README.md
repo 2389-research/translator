@@ -54,7 +54,7 @@ translator config
 This will walk you through setting up your configuration, including:
 - Choosing where to store your configuration (.env files)
 - Setting your OpenAI API key
-- Configuring optional settings like default model and output directory
+- Configuring optional settings like default model
 
 Alternatively, you can configure manually in several ways (in order of precedence):
 
