@@ -861,7 +861,7 @@ wheels = [
 [[package]]
 name = "translator"
 version = "0.2.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "openai" },
     { name = "pycountry" },
