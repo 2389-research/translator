@@ -244,8 +244,8 @@ class StreamingTokenDisplay:
 class TranslatorCLI:
     """Command-line interface for the translator."""
 
-    @staticmethod
-    def setup_openai_client() -> openai.OpenAI:
+    @classmethod
+    def setup_openai_client(cls) -> openai.OpenAI:
         """Set up and return an OpenAI client.
         
         Looks for the OpenAI API key in the following locations (in order of precedence):
@@ -296,7 +296,7 @@ class TranslatorCLI:
             translator_dir = os.path.join(home_dir, ".translator")
             
             if not os.path.exists(translator_dir):
-                if TranslatorCLI.confirm("Would you like to create a config directory at ~/.translator?"):
+                if cls.confirm("Would you like to create a config directory at ~/.translator?"):
                     try:
                         os.makedirs(translator_dir, exist_ok=True)
                         env_path = os.path.join(translator_dir, ".env")
@@ -481,6 +481,7 @@ class TranslatorCLI:
     @classmethod
     def create_config_dialog(cls) -> None:
         """Interactive dialog to create and configure the .env file."""
+        # We use the global console object for consistent UI throughout the application
         console.print("[bold]Translator Configuration Setup[/]")
         console.print("This will help you set up your translator configuration.")
         
