@@ -19,8 +19,8 @@ dependencies = [
 [project.scripts]
 translate = "translator.cli:TranslatorCLI.run"
 
-[project.packages]
-find = {}
+[tool.setuptools]
+packages = ["translator"]
 
 [tool.uv.sources]
 swarm = { git = "https://github.com/openai/swarm.git" }
