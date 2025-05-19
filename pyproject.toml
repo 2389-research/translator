@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [project.scripts]
-translate = "translator.cli:TranslatorCLI.run"
+translator = "translator.cli:TranslatorCLI.run"
 
 [tool.setuptools]
 packages = ["translator"]
