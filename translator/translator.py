@@ -43,21 +43,24 @@ class Translator:
         self, text: str, target_language: str, model: str, stream: bool = False,
         cancellation_handler=None, token_callback=None
     ) -> Tuple[Optional[str], Dict, Optional[str]]:
-        """Translate text to the target language using OpenAI.
-
+        """
+        Translates text into the target language using the specified OpenAI model.
+        
+        Supports both streaming and non-streaming responses, with optional cancellation and token callbacks. Returns the translated text, usage statistics, and an error message if the translation fails.
+        
         Args:
-            text: The text to translate
-            target_language: The target language for translation
-            model: The model to use for translation
-            stream: Whether to stream responses (default: False)
-            cancellation_handler: Optional handler to check for cancellation requests
-            token_callback: Optional callback function called for each token during streaming
-
+            text: The text to translate.
+            target_language: The language to translate the text into.
+            model: The OpenAI model to use for translation.
+            stream: If True, streams the translation response incrementally.
+            cancellation_handler: Optional handler to interrupt translation if cancellation is requested.
+            token_callback: Optional function called with each token during streaming.
+        
         Returns:
-            Tuple containing:
-                - Translated text (None if error occurred)
-                - Usage information dictionary
-                - Error message (None if successful)
+            A tuple containing:
+                - The translated text, or None if an error occurred.
+                - A dictionary with usage statistics.
+                - An error message string, or None if successful.
         """
         system_prompt = Prompts.translation_system_prompt(target_language)
         user_prompt = Prompts.translation_user_prompt(text)
@@ -150,22 +153,22 @@ class Translator:
         self, translated_text: str, original_text: str, target_language: str, model: str,
         stream: bool = False, cancellation_handler=None, token_callback=None
     ) -> Tuple[str, Dict, Optional[str]]:
-        """Edit the translation to ensure it makes sense in the target language while preserving original meaning.
-
+        """
+        Edits a translated text to improve fluency and accuracy while preserving the original meaning.
+        
+        If streaming is enabled, the response is returned incrementally and can be canceled or processed token by token via optional handlers.
+        
         Args:
-            translated_text: The translated text to edit
-            original_text: The original text for reference
-            target_language: The target language
-            model: The model to use for editing
-            stream: Whether to stream responses (default: False)
-            cancellation_handler: Optional handler to check for cancellation requests
-            token_callback: Optional callback function called for each token during streaming
-
+            translated_text: The text to be edited.
+            original_text: The original source text for reference.
+            target_language: The language into which the text is translated.
+            model: The model identifier to use for editing.
+            stream: If True, enables streaming of the response (default: False).
+            cancellation_handler: Optional handler to interrupt the operation if cancellation is requested.
+            token_callback: Optional function called with each token during streaming.
+        
         Returns:
-            Tuple containing:
-                - Edited text (original text returned if error occurred)
-                - Usage information dictionary
-                - Error message (None if successful)
+            A tuple containing the edited text (or the original if an error occurs), a dictionary with usage statistics, and an error message (None if successful).
         """
         system_prompt = Prompts.editing_system_prompt(target_language)
         user_prompt = Prompts.editing_user_prompt(
@@ -272,23 +275,26 @@ class Translator:
         self, translated_text: str, original_text: str, target_language: str, model: str,
         stream: bool = False, cancellation_handler=None, token_callback=None
     ) -> Tuple[str, Dict, str, Optional[str]]:
-        """Aggressively critique the translation against the original text.
-
+        """
+        Provides an aggressive critique of a translated text compared to the original.
+        
+        Evaluates the quality and accuracy of the translated text by generating detailed feedback using the specified model. Supports both streaming and non-streaming responses, with optional cancellation and token callbacks.
+        
         Args:
-            translated_text: The translated text to critique
-            original_text: The original text for reference
-            target_language: The target language
-            model: The model to use for critique
-            stream: Whether to stream responses (default: False)
-            cancellation_handler: Optional handler to check for cancellation requests
-            token_callback: Optional callback function called for each token during streaming
-
+            translated_text: The translated text to be critiqued.
+            original_text: The original source text for comparison.
+            target_language: The language into which the text was translated.
+            model: The model used for critique.
+            stream: If True, streams the critique response incrementally.
+            cancellation_handler: Optional handler to interrupt streaming if cancellation is requested.
+            token_callback: Optional function called with each token during streaming.
+        
         Returns:
-            Tuple containing:
-                - Translated text (unchanged)
-                - Usage information dictionary
-                - Critique feedback as a string (empty if error occurred)
-                - Error message (None if successful)
+            A tuple containing:
+                - The original translated text (unchanged).
+                - A dictionary with token usage statistics.
+                - The critique feedback as a string (empty if an error occurred).
+                - An error message if the critique failed, otherwise None.
         """
         system_prompt = Prompts.critique_system_prompt(target_language)
         user_prompt = Prompts.critique_user_prompt(original_text, translated_text)
@@ -403,23 +409,26 @@ class Translator:
         cancellation_handler=None,
         token_callback=None,
     ) -> Tuple[str, Dict, Optional[str]]:
-        """Apply critique feedback to improve the translation.
-
+        """
+        Applies critique feedback to improve a translated text using the specified model.
+        
+        If streaming is enabled, the response is returned incrementally and can be canceled or processed token-by-token via optional handlers.
+        
         Args:
-            translated_text: The translated text to improve
-            original_text: The original text for reference
-            critique_feedback: The detailed critique feedback
-            target_language: The target language
-            model: The model to use for applying feedback
-            stream: Whether to stream responses (default: False)
-            cancellation_handler: Optional handler to check for cancellation requests
-            token_callback: Optional callback function called for each token during streaming
-
+            translated_text: The translated text to be improved.
+            original_text: The original source text for reference.
+            critique_feedback: Feedback detailing issues or suggestions for improvement.
+            target_language: The language into which the text is being translated.
+            model: The model identifier to use for applying feedback.
+            stream: If True, enables streaming of the response (default: False).
+            cancellation_handler: Optional handler to interrupt processing if cancellation is requested.
+            token_callback: Optional function called with each token during streaming.
+        
         Returns:
-            Tuple containing:
-                - Improved text after applying critique feedback (original text returned if error occurred)
-                - Usage information dictionary
-                - Error message (None if successful)
+            A tuple containing:
+                - The improved translation (or the original text if an error occurs).
+                - A dictionary with token usage statistics.
+                - An error message if an error occurred, otherwise None.
         """
         system_prompt = Prompts.feedback_system_prompt(target_language)
         user_prompt = Prompts.feedback_user_prompt(
@@ -532,22 +541,25 @@ class Translator:
         cancellation_handler=None,
         token_callback=None,
     ) -> Tuple[Dict, Dict, Optional[str]]:
-        """Translate specified fields in frontmatter.
-
+        """
+        Translates specified fields within a frontmatter dictionary into a target language.
+        
+        The method processes the given fields, sends them for translation using the specified model, and updates the frontmatter copy with translated values. Supports streaming responses, cancellation, and token callbacks. If an error occurs, returns the original frontmatter data.
+        
         Args:
-            frontmatter_data: The frontmatter data as a dictionary
-            fields: List of fields to translate
-            target_language: The target language
-            model: The model to use for translation
-            stream: Whether to stream responses (default: False)
-            cancellation_handler: Optional handler to check for cancellation requests
-            token_callback: Optional callback function called for each token during streaming
-
+            frontmatter_data: Dictionary containing the frontmatter to translate.
+            fields: List of field names within the frontmatter to translate.
+            target_language: Language to translate the fields into.
+            model: Model identifier to use for translation.
+            stream: If True, enables streaming of translation tokens.
+            cancellation_handler: Optional handler to support cancellation during streaming.
+            token_callback: Optional function called with each token during streaming.
+        
         Returns:
-            Tuple containing:
-                - Translated frontmatter data (original data returned if error occurred)
-                - Usage information dictionary
-                - Error message (None if successful)
+            A tuple containing:
+                - The frontmatter dictionary with translated fields (original if error occurs).
+                - A dictionary with token usage statistics.
+                - An error message string if an error occurred, otherwise None.
         """
         # Create a copy to avoid modifying the original
         translated_frontmatter = frontmatter_data.copy()
