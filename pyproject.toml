@@ -22,5 +22,8 @@ translator = "translator.cli:TranslatorCLI.run"
 [tool.setuptools]
 packages = ["translator"]
 
+[tool.uv]
+package = true
+
 [tool.uv.sources]
 swarm = { git = "https://github.com/openai/swarm.git" }
