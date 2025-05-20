@@ -104,7 +104,7 @@ def test_translate_text_without_context(translator_instance):
     assert translator_instance.translation_log["translation"]["context"] == ""
 
 
-def test_translate_text_with_context(translator_instance):
+def test_translate_text_with_context(translator_instance: Translator) -> None:
     """Test the translate_text method with context."""
     # Mock the OpenAI API response
     mock_response = create_mock_response("Texto traducido al español con contexto.")
@@ -120,7 +120,7 @@ def test_translate_text_with_context(translator_instance):
     model = "gpt-4"
 
     translated_text, usage, error_msg = translator_instance.translate_text(
-        text, target_language, model
+        text, target_language, model,
     )
 
     # Verify results
@@ -143,7 +143,6 @@ def test_translate_text_with_context(translator_instance):
     # Verify translation log was updated
     assert "context" in translator_instance.translation_log["translation"]
     assert translator_instance.translation_log["translation"]["context"] == context
-
 
 def test_translate_text_error(translator_instance):
     """Test error handling in translate_text method."""
