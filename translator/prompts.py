@@ -27,19 +27,28 @@ class Prompts:
         8. If there isn't a direct or natural translation for a particular term or phrase, keep it in the original language and surround it with quotes if necessary.
         9. Ensure that technical terms or jargon remain accurate; if there's no suitable translation, keep the original term.
         10. Strive for fluid, native-sounding prose that retains the tone and intent of the original text.
+        11. If context about the text is provided, use it to inform your translation choices, especially regarding tone, style, and cultural adaptations.
         """
 
     @staticmethod
-    def translation_user_prompt(text: str) -> str:
+    def translation_user_prompt(text: str, context: str = "") -> str:
         """Get the user prompt for translation.
 
         Args:
             text: The text to translate
+            context: Optional context about the text being translated
 
         Returns:
             The user prompt for translation
         """
-        return text
+        if context:
+            return f"""# CONTEXT
+{context}
+
+# TEXT TO TRANSLATE
+{text}"""
+        else:
+            return text
 
     @staticmethod
     def editing_system_prompt(target_language: str) -> str:

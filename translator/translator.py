@@ -30,6 +30,7 @@ class Translator:
             client: OpenAI client instance
         """
         self.client = client
+        self.translation_context = ""
         self.translation_log = {
             "translation": {},
             "editing": {},
@@ -63,7 +64,7 @@ class Translator:
                 - An error message string, or None if successful.
         """
         system_prompt = Prompts.translation_system_prompt(target_language)
-        user_prompt = Prompts.translation_user_prompt(text)
+        user_prompt = Prompts.translation_user_prompt(text, self.translation_context)
         
         empty_usage = {
             "prompt_tokens": 0,
@@ -119,6 +120,7 @@ class Translator:
                     "target_language": target_language,
                     "system_prompt": system_prompt,
                     "user_prompt": user_prompt,
+                    "context": self.translation_context,
                     "response": full_response,
                     "usage": usage,
                     "streaming": True,
@@ -139,6 +141,7 @@ class Translator:
                     "target_language": target_language,
                     "system_prompt": system_prompt,
                     "user_prompt": user_prompt,
+                    "context": self.translation_context,
                     "response": response.choices[0].message.content,
                     "usage": usage,
                     "streaming": False,

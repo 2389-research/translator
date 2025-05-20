@@ -585,7 +585,7 @@ class TranslatorCLI:
         # If the first argument is 'config', use command subparsers
         if first_arg == 'config':
             subparsers = parser.add_subparsers(dest="command")
-            config_parser = subparsers.add_parser("config", help="Configure the translator")
+            subparsers.add_parser("config", help="Configure the translator")
             
             # Parse args and return
             return parser.parse_args()
@@ -1413,6 +1413,7 @@ class TranslatorCLI:
             "do_critique": do_critique,
             "critique_loops": critique_loops,
             "has_frontmatter": has_frontmatter,
+            "translation_context": translator.translation_context,
             "token_usage": total_usage,
             "cost": cost_str,
             "prompts_and_responses": translator.translation_log,
@@ -1543,6 +1544,31 @@ class TranslatorCLI:
 
         console.print(f"[bold]Translating to:[/] {escape(target_language)}")
         console.print(f"[bold]Using model:[/] {escape(model)}")
+        
+        # Ask user for context about the piece being translated
+        console.print("[bold cyan]Please provide some context about the piece being translated.[/]")
+        console.print("This could include information about the author, intended audience, tone, purpose, etc.")
+        console.print("This context will help produce a more accurate and appropriate translation.")
+        console.print("(Press Enter twice to submit)")
+        
+        # Collect context input (allowing for multi-line input)
+        context_lines = []
+        while True:
+            line = input()
+            if not line and (not context_lines or not context_lines[-1]):
+                break
+            context_lines.append(line)
+        
+        translation_context = "\n".join(context_lines).strip()
+        
+        # If context is provided, show confirmation
+        if translation_context:
+            console.print("[bold green]Context received. This will be used to guide the translation.[/]")
+            # Store context in translator instance for use in prompts
+            translator.translation_context = translation_context
+        else:
+            console.print("[dim]No context provided. Proceeding with translation.[/dim]")
+            translator.translation_context = ""
 
         # Translate frontmatter if present
         translated_frontmatter, frontmatter_usage, total_usage = (

@@ -48,6 +48,7 @@ def test_init(openai_client):
     translator = Translator(openai_client)
 
     assert translator.client == openai_client
+    assert translator.translation_context == ""
     assert isinstance(translator.translation_log, dict)
     assert "translation" in translator.translation_log
     assert "editing" in translator.translation_log
@@ -57,8 +58,8 @@ def test_init(openai_client):
     assert "all_critiques" in translator.translation_log
 
 
-def test_translate_text(translator_instance):
-    """Test the translate_text method."""
+def test_translate_text_without_context(translator_instance):
+    """Test the translate_text method without context."""
     # Mock the OpenAI API response
     mock_response = create_mock_response("Texto traducido al español.")
     translator_instance.client.chat.completions.create.return_value = mock_response
@@ -86,6 +87,8 @@ def test_translate_text(translator_instance):
     assert len(call_args["messages"]) == 2
     assert call_args["messages"][0]["role"] == "system"
     assert call_args["messages"][1]["role"] == "user"
+    # When no context is provided, user prompt should be just the text
+    assert call_args["messages"][1]["content"] == text
 
     # Verify translation log was updated
     assert "model" in translator_instance.translation_log["translation"]
@@ -97,6 +100,49 @@ def test_translate_text(translator_instance):
     )
     assert "response" in translator_instance.translation_log["translation"]
     assert "usage" in translator_instance.translation_log["translation"]
+    assert "context" in translator_instance.translation_log["translation"]
+    assert translator_instance.translation_log["translation"]["context"] == ""
+
+
+def test_translate_text_with_context(translator_instance):
+    """Test the translate_text method with context."""
+    # Mock the OpenAI API response
+    mock_response = create_mock_response("Texto traducido al español con contexto.")
+    translator_instance.client.chat.completions.create.return_value = mock_response
+
+    # Set translation context
+    context = "This is a literary piece written in the 19th century with formal language."
+    translator_instance.translation_context = context
+
+    # Call the method
+    text = "Text to be translated."
+    target_language = "Spanish"
+    model = "gpt-4"
+
+    translated_text, usage, error_msg = translator_instance.translate_text(
+        text, target_language, model
+    )
+
+    # Verify results
+    assert translated_text == "Texto traducido al español con contexto."
+    assert error_msg is None
+
+    # Verify the client was called correctly
+    call_args = translator_instance.client.chat.completions.create.call_args[1]
+    assert len(call_args["messages"]) == 2
+    assert call_args["messages"][0]["role"] == "system"
+    assert call_args["messages"][1]["role"] == "user"
+    
+    # Check that context is included in the user prompt
+    user_prompt = call_args["messages"][1]["content"]
+    assert "# CONTEXT" in user_prompt
+    assert context in user_prompt
+    assert "# TEXT TO TRANSLATE" in user_prompt
+    assert text in user_prompt
+
+    # Verify translation log was updated
+    assert "context" in translator_instance.translation_log["translation"]
+    assert translator_instance.translation_log["translation"]["context"] == context
 
 
 def test_translate_text_error(translator_instance):
