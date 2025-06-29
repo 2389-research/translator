@@ -627,6 +627,11 @@ class TranslatorCLI:
             action="store_true",
             help="Only estimate tokens and cost, don't translate",
         )
+        parser.add_argument(
+            "--headless",
+            action="store_true",
+            help="Skip context gathering and run without user interaction",
+        )
 
         args = parser.parse_args()
         
@@ -637,7 +642,7 @@ class TranslatorCLI:
     @classmethod
     def _parse_and_validate_args(
         cls, args: argparse.Namespace
-    ) -> Tuple[str, str, Optional[str], str, bool, bool, int, bool, bool]:
+    ) -> Tuple[str, str, Optional[str], str, bool, bool, int, bool, bool, bool]:
         """Parse and validate command line arguments.
 
         Args:
@@ -645,7 +650,7 @@ class TranslatorCLI:
 
         Returns:
             Tuple containing: input_file, target_language, output_file, model,
-            skip_edit, do_critique, critique_loops, estimate_only, has_valid_input
+            skip_edit, do_critique, critique_loops, estimate_only, has_valid_input, headless
         """
         # If --list-models is specified, display model info and exit
         if args.list_models:
@@ -662,6 +667,7 @@ class TranslatorCLI:
         # Limit critique loops to a reasonable number
         critique_loops = min(max(critique_loops, 0), 5)
         estimate_only = args.estimate_only
+        headless = args.headless
 
         # Validate input file
         has_valid_input = True
@@ -681,6 +687,7 @@ class TranslatorCLI:
             critique_loops,
             estimate_only,
             has_valid_input,
+            headless,
         )
 
     @classmethod
@@ -754,6 +761,7 @@ class TranslatorCLI:
         do_critique: bool,
         critique_loops: int,
         estimate_only: bool,
+        headless: bool,
     ) -> Tuple[bool, int, float, str, bool]:
         """Check token limits and estimate cost.
 
@@ -765,6 +773,7 @@ class TranslatorCLI:
             do_critique: Whether to perform critique
             critique_loops: Number of critique loops to perform
             estimate_only: Whether to only estimate tokens and cost
+            headless: Whether running in headless mode
 
         Returns:
             Tuple containing: within_limits, token_count, cost, cost_str, should_continue
@@ -789,15 +798,18 @@ class TranslatorCLI:
 
         should_continue = True
         if not within_limits:
-            console.print(
-                f"[bold red]Warning:[/] This text may exceed the {model} model's token limit."
-            )
-            console.print(
-                "Consider splitting the file into smaller parts or using a model with a higher token limit."
-            )
-            # Skip confirmation dialog when in estimate-only mode
-            if not estimate_only and not cls.confirm("Continue anyway?"):
+            if not headless:
+                console.print(
+                    f"[bold red]Warning:[/] This text may exceed the {model} model's token limit."
+                )
+                console.print(
+                    "Consider splitting the file into smaller parts or using a model with a higher token limit."
+                )
+            # Skip confirmation dialog when in estimate-only mode or headless mode
+            if not estimate_only and not headless and not cls.confirm("Continue anyway?"):
                 should_continue = False
+            elif headless and not estimate_only:
+                console.print("[dim]Running in headless mode - proceeding despite token limit warning.[/dim]")
 
         return within_limits, token_count, cost, cost_str, should_continue
 
@@ -1512,6 +1524,7 @@ class TranslatorCLI:
         do_critique: bool,
         critique_loops: int,
         translator: Translator,
+        headless: bool,
     ) -> Tuple[str, str, str]:
         """Translate a file to the target language.
 
@@ -1524,6 +1537,7 @@ class TranslatorCLI:
             do_critique: Whether to perform critique
             critique_loops: Number of critique loops to perform
             translator: Translator instance
+            headless: Whether running in headless mode
 
         Returns:
             Tuple containing: output_path, log_path, narrative_path
@@ -1545,30 +1559,36 @@ class TranslatorCLI:
         console.print(f"[bold]Translating to:[/] {escape(target_language)}")
         console.print(f"[bold]Using model:[/] {escape(model)}")
         
-        # Ask user for context about the piece being translated
-        console.print("[bold cyan]Please provide some context about the piece being translated.[/]")
-        console.print("This could include information about the author, intended audience, tone, purpose, etc.")
-        console.print("This context will help produce a more accurate and appropriate translation.")
-        console.print("(Press Enter twice to submit)")
-        
-        # Collect context input (allowing for multi-line input)
-        context_lines = []
-        while True:
-            line = input()
-            if not line and (not context_lines or not context_lines[-1]):
-                break
-            context_lines.append(line)
-        
-        translation_context = "\n".join(context_lines).strip()
-        
-        # If context is provided, show confirmation
-        if translation_context:
-            console.print("[bold green]Context received. This will be used to guide the translation.[/]")
-            # Store context in translator instance for use in prompts
-            translator.translation_context = translation_context
-        else:
-            console.print("[dim]No context provided. Proceeding with translation.[/dim]")
+        # Handle context gathering based on headless flag
+        if headless:
+            # Skip context gathering in headless mode
+            console.print("[dim]Running in headless mode - skipping context gathering.[/dim]")
             translator.translation_context = ""
+        else:
+            # Ask user for context about the piece being translated
+            console.print("[bold cyan]Please provide some context about the piece being translated.[/]")
+            console.print("This could include information about the author, intended audience, tone, purpose, etc.")
+            console.print("This context will help produce a more accurate and appropriate translation.")
+            console.print("(Press Enter twice to submit)")
+            
+            # Collect context input (allowing for multi-line input)
+            context_lines = []
+            while True:
+                line = input()
+                if not line and (not context_lines or not context_lines[-1]):
+                    break
+                context_lines.append(line)
+            
+            translation_context = "\n".join(context_lines).strip()
+            
+            # If context is provided, show confirmation
+            if translation_context:
+                console.print("[bold green]Context received. This will be used to guide the translation.[/]")
+                # Store context in translator instance for use in prompts
+                translator.translation_context = translation_context
+            else:
+                console.print("[dim]No context provided. Proceeding with translation.[/dim]")
+                translator.translation_context = ""
 
         # Translate frontmatter if present
         translated_frontmatter, frontmatter_usage, total_usage = (
@@ -1680,6 +1700,7 @@ class TranslatorCLI:
             critique_loops,
             estimate_only,
             has_valid_input,
+            headless,
         ) = cls._parse_and_validate_args(args)
 
         if not has_valid_input:
@@ -1709,6 +1730,7 @@ class TranslatorCLI:
                 do_critique,
                 critique_loops,
                 estimate_only,
+                headless,
             )
         )
 
@@ -1733,4 +1755,5 @@ class TranslatorCLI:
             do_critique,
             critique_loops,
             translator,
+            headless,
         )
