@@ -12,6 +12,7 @@ from typing import Dict, List, Optional, Tuple
 
 import frontmatter
 import openai
+import anthropic
 from dotenv import load_dotenv
 from rich.console import Console
 from rich.live import Live
@@ -303,21 +304,44 @@ class TranslatorCLI:
                         with open(env_path, "w") as f:
                             f.write("# OpenAI API Key (required)\n")
                             f.write("OPENAI_API_KEY=your_openai_api_key_here\n\n")
-                            f.write("# Default model (optional, defaults to o3)\n")
-                            f.write("# DEFAULT_MODEL=o3\n\n")
+                            f.write("# Anthropic API Key (optional, for Claude models)\n")
+                            f.write("# ANTHROPIC_API_KEY=your_anthropic_api_key_here\n\n")
+                            f.write("# Default model (optional, defaults to claude-opus-4.1)\n")
+                            f.write("# DEFAULT_MODEL=claude-opus-4.1\n\n")
                             f.write("# Output directory (defaults to same location as input file)\n")
                             f.write("# OUTPUT_DIR=/path/to/output/directory\n\n")
                             f.write("# Log level (defaults to INFO)\n")
                             f.write("# LOG_LEVEL=INFO  # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL\n")
                         
                         console.print(f"[bold green]Created config template at:[/] {env_path}")
-                        console.print("Please edit this file to add your OpenAI API key.")
+                        console.print("Please edit this file to add your API keys.")
                     except Exception as e:
                         console.print(f"[bold red]Failed to create config directory:[/] {str(e)}")
                 
             sys.exit(1)
 
         return openai.OpenAI(api_key=api_key)
+
+    @classmethod
+    def setup_anthropic_client(cls) -> Optional[anthropic.Anthropic]:
+        """Set up and return an Anthropic client.
+
+        Looks for the Anthropic API key in the following locations (in order of precedence):
+        1. Environment variables
+        2. .env file in the current working directory
+        3. .env file in ~/.translator/ directory
+        4. .env file in ~/.config/translator/ directory
+
+        Returns None if no API key is found (Anthropic models will be unavailable).
+        """
+        # API key should already be loaded by setup_openai_client
+        api_key = os.getenv("ANTHROPIC_API_KEY")
+
+        if not api_key:
+            # Anthropic is optional, so just return None if no key is found
+            return None
+
+        return anthropic.Anthropic(api_key=api_key)
 
     @staticmethod
     def confirm(prompt: str) -> bool:
@@ -328,21 +352,53 @@ class TranslatorCLI:
     @staticmethod
     def display_model_info() -> None:
         """Display information about available models and their costs."""
-        table = Table(title="Available Models")
+        # Display configured models table
+        table = Table(title="Available Models (with pricing)")
         table.add_column("Model", style="cyan")
+        table.add_column("Provider", style="blue")
         table.add_column("Max Tokens", style="green")
         table.add_column("Input Cost (per 1K tokens)", style="yellow")
         table.add_column("Output Cost (per 1K tokens)", style="yellow")
+        table.add_column("Capabilities", style="magenta")
 
         for model, config in ModelConfig.MODELS.items():
+            capabilities = config.get('capabilities', [])
+            cap_display = ", ".join(capabilities) if capabilities else "Standard"
+            provider = config.get('provider', 'unknown').title()
             table.add_row(
                 model,
+                provider,
                 f"{config['max_tokens']:,}",
                 f"${config['input_cost']:.4f}",
                 f"${config['output_cost']:.4f}",
+                cap_display
             )
 
         console.print(table)
+
+        # Try to fetch and display additional models from OpenAI API
+        console.print("\n[bold]Fetching additional models from OpenAI API...[/]")
+        try:
+            api_models = ModelConfig.get_available_openai_models()
+            local_models = set(ModelConfig.MODELS.keys())
+            additional_models = [m for m in api_models if m not in local_models]
+
+            if additional_models:
+                api_table = Table(title="Additional API Models (no local pricing)")
+                api_table.add_column("Model", style="cyan")
+                api_table.add_column("Status", style="green")
+
+                for model in additional_models:
+                    api_table.add_row(model, "Available via API")
+
+                console.print(api_table)
+                console.print(f"\n[yellow]Note:[/] {len(additional_models)} additional models available. Use them with caution as pricing is not configured locally.")
+            else:
+                console.print("[green]✓[/] All available API models are already configured locally.")
+
+        except Exception as e:
+            console.print(f"[yellow]Warning:[/] Could not fetch API models: {str(e)}")
+            console.print("[dim]Showing locally configured models only.[/]")
 
     @staticmethod
     def display_usage_table(
@@ -536,9 +592,9 @@ class TranslatorCLI:
         config["OPENAI_API_KEY"] = api_key
         
         # Default model (optional)
-        console.print("\n[bold]Default Model (optional, default: o3)[/]")
+        console.print("\n[bold]Default Model (optional, default: claude-opus-4.1)[/]")
         console.print("Available models: " + ", ".join(ModelConfig.MODELS.keys()))
-        default_model = input("Enter your preferred default model (or press Enter for o3): ").strip()
+        default_model = input("Enter your preferred default model (or press Enter for claude-opus-4.1): ").strip()
         if default_model:
             if default_model in ModelConfig.MODELS:
                 config["DEFAULT_MODEL"] = default_model
@@ -553,7 +609,7 @@ class TranslatorCLI:
                 
                 # Add comments for documentation
                 if "DEFAULT_MODEL" not in config:
-                    f.write("\n# Default model (uncomment to change)\n# DEFAULT_MODEL=o3\n")
+                    f.write("\n# Default model (uncomment to change)\n# DEFAULT_MODEL=claude-opus-4.1\n")
                 
                 # Include comment about output directory but don't prompt for it
                 f.write("\n# Output directory (defaults to same location as input file)\n# OUTPUT_DIR=/path/to/output/directory\n")
@@ -595,11 +651,11 @@ class TranslatorCLI:
             sys.argv.pop(1)  # Remove 'translate' argument
             
         # Set up standard translation arguments
-        parser.add_argument("file", help="Path to the text file to translate")
-        parser.add_argument("language", help="Target language for translation")
+        parser.add_argument("file", nargs='?', help="Path to the text file to translate")
+        parser.add_argument("language", nargs='?', help="Target language for translation")
         parser.add_argument("-o", "--output", help="Output file path (optional)")
         parser.add_argument(
-            "-m", "--model", default="o3", help="OpenAI model to use (default: o3)"
+            "-m", "--model", default="claude-opus-4.1", help="AI model to use (default: claude-opus-4.1)"
         )
         parser.add_argument(
             "--no-edit",
@@ -656,6 +712,11 @@ class TranslatorCLI:
         if args.list_models:
             cls.display_model_info()
             sys.exit(0)
+
+        # Check that required arguments are provided for translation
+        if not args.file or not args.language:
+            console.print("[bold red]Error:[/] file and language arguments are required for translation")
+            sys.exit(1)
 
         input_file = args.file
         target_language = args.language
@@ -1741,9 +1802,10 @@ class TranslatorCLI:
         if estimate_only:
             sys.exit(0)
 
-        # Set up OpenAI client and translator
-        client = cls.setup_openai_client()
-        translator = Translator(client)
+        # Set up OpenAI and Anthropic clients
+        openai_client = cls.setup_openai_client()
+        anthropic_client = cls.setup_anthropic_client()
+        translator = Translator(openai_client=openai_client, anthropic_client=anthropic_client)
 
         # Translate the file
         cls.translate_file(

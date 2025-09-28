@@ -1,0 +1,258 @@
+digraph TranslatorArchitecture {
+    // Graph settings
+    rankdir=TB;
+    splines=true;
+    concentrate=true;
+    compound=true;
+    node [fontname="Arial", fontsize=10];
+    edge [fontname="Arial", fontsize=8];
+
+    // Color scheme
+    // Entry point: light blue
+    // CLI layer: blue
+    // Core logic: green
+    // Utilities: yellow
+    // External deps: gray
+    // Tests: orange
+
+    // Entry Point Cluster
+    subgraph cluster_entry {
+        label="Entry Point";
+        style=filled;
+        fillcolor=lightblue;
+        fontsize=12;
+        fontweight=bold;
+
+        main_py [label="main.py\nCLI Entry Point", shape=box, fillcolor=lightblue, style=filled];
+    }
+
+    // CLI Layer Cluster
+    subgraph cluster_cli {
+        label="CLI Interface Layer";
+        style=filled;
+        fillcolor=lightsteelblue;
+        fontsize=12;
+        fontweight=bold;
+
+        cli_py [label="cli.py\nTranslatorCLI\n(Orchestrator)", shape=box, fillcolor=cornflowerblue, style=filled];
+    }
+
+    // Core Translation Engine Cluster
+    subgraph cluster_core {
+        label="Core Translation Engine";
+        style=filled;
+        fillcolor=lightgreen;
+        fontsize=12;
+        fontweight=bold;
+
+        translator_py [label="translator.py\nTranslator\n(Core Logic)", shape=box, fillcolor=limegreen, style=filled];
+        prompts_py [label="prompts.py\nPrompts\n(Templates)", shape=box, fillcolor=lightgreen, style=filled];
+    }
+
+    // Configuration & Cost Cluster
+    subgraph cluster_config {
+        label="Configuration & Cost Management";
+        style=filled;
+        fillcolor=lightyellow;
+        fontsize=12;
+        fontweight=bold;
+
+        config_py [label="config.py\nModelConfig\n(Models & Settings)", shape=box, fillcolor=yellow, style=filled];
+        cost_py [label="cost.py\nCostEstimator\n(Price Calculation)", shape=box, fillcolor=yellow, style=filled];
+        token_counter_py [label="token_counter.py\nTokenCounter\n(Token Counting)", shape=box, fillcolor=yellow, style=filled];
+    }
+
+    // File Handling Cluster
+    subgraph cluster_file {
+        label="File & Content Processing";
+        style=filled;
+        fillcolor=lightcyan;
+        fontsize=12;
+        fontweight=bold;
+
+        file_handler_py [label="file_handler.py\nFileHandler\n(I/O Operations)", shape=box, fillcolor=cyan, style=filled];
+        frontmatter_handler_py [label="frontmatter_handler.py\nFrontmatterHandler\n(YAML Processing)", shape=box, fillcolor=cyan, style=filled];
+        language_py [label="language.py\nLanguageHandler\n(Language Codes)", shape=box, fillcolor=cyan, style=filled];
+    }
+
+    // Logging & Analysis Cluster
+    subgraph cluster_logging {
+        label="Logging & Analysis";
+        style=filled;
+        fillcolor=mistyrose;
+        fontsize=12;
+        fontweight=bold;
+
+        log_interpreter_py [label="log_interpreter.py\nLogInterpreter\n(Process Analysis)", shape=box, fillcolor=lightcoral, style=filled];
+    }
+
+    // External Dependencies Cluster
+    subgraph cluster_external {
+        label="External Dependencies";
+        style=filled;
+        fillcolor=lightgray;
+        fontsize=12;
+        fontweight=bold;
+
+        openai [label="openai\n(API Client)", shape=ellipse, fillcolor=gray, style=filled];
+        rich [label="rich\n(Terminal UI)", shape=ellipse, fillcolor=gray, style=filled];
+        tiktoken [label="tiktoken\n(Tokenization)", shape=ellipse, fillcolor=gray, style=filled];
+        frontmatter [label="python-frontmatter\n(YAML Parser)", shape=ellipse, fillcolor=gray, style=filled];
+        pycountry [label="pycountry\n(Country Codes)", shape=ellipse, fillcolor=gray, style=filled];
+        dotenv [label="python-dotenv\n(Config Loading)", shape=ellipse, fillcolor=gray, style=filled];
+        swarm [label="swarm\n(OpenAI Extension)", shape=ellipse, fillcolor=gray, style=filled];
+    }
+
+    // Test Infrastructure Cluster
+    subgraph cluster_tests {
+        label="Test Infrastructure";
+        style=filled;
+        fillcolor=wheat;
+        fontsize=12;
+        fontweight=bold;
+
+        test_translator [label="test_translator.py", shape=box, fillcolor=orange, style=filled];
+        test_cli [label="test_*.py\n(Other Tests)", shape=box, fillcolor=orange, style=filled];
+        pytest [label="pytest\n(Test Runner)", shape=ellipse, fillcolor=gray, style=filled];
+    }
+
+    // Build & Package Cluster
+    subgraph cluster_build {
+        label="Build & Package";
+        style=filled;
+        fillcolor=lavender;
+        fontsize=12;
+        fontweight=bold;
+
+        pyproject_toml [label="pyproject.toml\n(Package Config)", shape=diamond, fillcolor=plum, style=filled];
+        uv_lock [label="uv.lock\n(Dependencies)", shape=diamond, fillcolor=plum, style=filled];
+    }
+
+    // ==========================================
+    // PRIMARY FLOW RELATIONSHIPS (thick blue)
+    // ==========================================
+
+    // Entry point flow
+    main_py -> cli_py [color=blue, penwidth=3, label="entry"];
+
+    // CLI orchestration (fan-out)
+    cli_py -> translator_py [color=blue, penwidth=2, label="translate"];
+    cli_py -> file_handler_py [color=blue, penwidth=2, label="file I/O"];
+    cli_py -> frontmatter_handler_py [color=blue, penwidth=2, label="frontmatter"];
+    cli_py -> log_interpreter_py [color=blue, penwidth=2, label="logging"];
+    cli_py -> cost_py [color=blue, penwidth=2, label="cost calc"];
+    cli_py -> token_counter_py [color=blue, penwidth=2, label="tokens"];
+    cli_py -> config_py [color=blue, penwidth=2, label="config"];
+
+    // ==========================================
+    // INTERNAL MODULE DEPENDENCIES (green)
+    // ==========================================
+
+    // Core logic dependencies
+    translator_py -> prompts_py [color=green, penwidth=2, label="templates"];
+
+    // Configuration dependencies
+    cost_py -> config_py [color=green, label="model info"];
+    token_counter_py -> config_py [color=green, label="model info"];
+
+    // File handling dependencies
+    file_handler_py -> language_py [color=green, label="lang codes"];
+
+    // ==========================================
+    // EXTERNAL DEPENDENCIES (gray)
+    // ==========================================
+
+    // Core external deps
+    translator_py -> openai [color=gray, label="API calls"];
+    log_interpreter_py -> openai [color=gray, label="API calls"];
+
+    // UI dependencies
+    cli_py -> rich [color=gray, label="console"];
+    file_handler_py -> rich [color=gray, label="console"];
+    frontmatter_handler_py -> rich [color=gray, label="console"];
+    log_interpreter_py -> rich [color=gray, label="console"];
+
+    // Token counting
+    token_counter_py -> tiktoken [color=gray, label="tokenize"];
+
+    // Content processing
+    frontmatter_handler_py -> frontmatter [color=gray, label="YAML parse"];
+    cli_py -> frontmatter [color=gray, label="metadata"];
+
+    // Language handling
+    language_py -> pycountry [color=gray, label="country codes"];
+
+    // Configuration
+    cli_py -> dotenv [color=gray, label="env vars"];
+
+    // OpenAI extensions
+    translator_py -> swarm [color=gray, style=dashed, label="future use"];
+
+    // ==========================================
+    // TEST RELATIONSHIPS (orange, dashed)
+    // ==========================================
+
+    test_translator -> translator_py [color=orange, style=dashed, label="tests"];
+    test_cli -> cli_py [color=orange, style=dashed, label="tests"];
+    test_cli -> file_handler_py [color=orange, style=dashed, label="tests"];
+    test_cli -> frontmatter_handler_py [color=orange, style=dashed, label="tests"];
+    test_cli -> cost_py [color=orange, style=dashed, label="tests"];
+    test_cli -> token_counter_py [color=orange, style=dashed, label="tests"];
+    test_cli -> config_py [color=orange, style=dashed, label="tests"];
+    test_cli -> language_py [color=orange, style=dashed, label="tests"];
+    test_cli -> log_interpreter_py [color=orange, style=dashed, label="tests"];
+
+    // Test infrastructure
+    test_translator -> pytest [color=gray, style=dashed];
+    test_cli -> pytest [color=gray, style=dashed];
+
+    // ==========================================
+    // BUILD & PACKAGE DEPENDENCIES (purple)
+    // ==========================================
+
+    pyproject_toml -> openai [color=purple, style=dotted, label="declares"];
+    pyproject_toml -> rich [color=purple, style=dotted];
+    pyproject_toml -> tiktoken [color=purple, style=dotted];
+    pyproject_toml -> frontmatter [color=purple, style=dotted];
+    pyproject_toml -> pycountry [color=purple, style=dotted];
+    pyproject_toml -> dotenv [color=purple, style=dotted];
+    pyproject_toml -> swarm [color=purple, style=dotted];
+    pyproject_toml -> pytest [color=purple, style=dotted];
+
+    uv_lock -> pyproject_toml [color=purple, label="locks"];
+
+    // ==========================================
+    // DATA FLOW ANNOTATIONS
+    // ==========================================
+
+    // Create invisible nodes for flow annotations
+    input [label="User Input\n(file + language)", shape=note, fillcolor=lightblue, style=filled];
+    output [label="Translated File\n+ Cost Report\n+ Logs", shape=note, fillcolor=lightgreen, style=filled];
+
+    // Data flow path
+    input -> main_py [color=red, penwidth=2, style=bold, label="user command"];
+
+    // Output flow
+    cli_py -> output [color=red, penwidth=2, style=bold, label="results"];
+
+    // ==========================================
+    // LEGEND
+    // ==========================================
+
+    // Legend nodes (outside clusters to avoid rank conflicts)
+    legend_entry [label="Entry Point", shape=box, fillcolor=lightblue, style=filled];
+    legend_cli [label="CLI Layer", shape=box, fillcolor=cornflowerblue, style=filled];
+    legend_core [label="Core Logic", shape=box, fillcolor=limegreen, style=filled];
+    legend_util [label="Utilities", shape=box, fillcolor=yellow, style=filled];
+    legend_ext [label="External Deps", shape=ellipse, fillcolor=gray, style=filled];
+    legend_test [label="Tests", shape=box, fillcolor=orange, style=filled];
+
+    // Edge legend
+    legend_entry -> legend_cli [color=blue, penwidth=2, label="primary flow"];
+    legend_core -> legend_util [color=green, label="internal deps"];
+    legend_cli -> legend_ext [color=gray, label="external deps"];
+    legend_test -> legend_core [color=orange, style=dashed, label="test coverage"];
+
+    // Position legend at bottom
+    {rank=same; legend_entry; legend_cli; legend_core; legend_util; legend_ext; legend_test;}
+}
