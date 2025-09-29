@@ -46,6 +46,7 @@ digraph TranslatorArchitecture {
         fontweight=bold;
 
         translator_py [label="translator.py\nTranslator\n(Core Logic)", shape=box, fillcolor=limegreen, style=filled];
+        providers_py [label="providers.py\nProviderFactory\n(Multi-Provider)", shape=box, fillcolor=mediumseagreen, style=filled];
         prompts_py [label="prompts.py\nPrompts\n(Templates)", shape=box, fillcolor=lightgreen, style=filled];
     }
 
@@ -94,7 +95,8 @@ digraph TranslatorArchitecture {
         fontsize=12;
         fontweight=bold;
 
-        openai [label="openai\n(API Client)", shape=ellipse, fillcolor=gray, style=filled];
+        openai [label="openai\n(OpenAI API Client)", shape=ellipse, fillcolor=gray, style=filled];
+        anthropic [label="anthropic\n(Anthropic API Client)", shape=ellipse, fillcolor=gray, style=filled];
         rich [label="rich\n(Terminal UI)", shape=ellipse, fillcolor=gray, style=filled];
         tiktoken [label="tiktoken\n(Tokenization)", shape=ellipse, fillcolor=gray, style=filled];
         frontmatter [label="python-frontmatter\n(YAML Parser)", shape=ellipse, fillcolor=gray, style=filled];
@@ -150,6 +152,8 @@ digraph TranslatorArchitecture {
 
     // Core logic dependencies
     translator_py -> prompts_py [color=green, penwidth=2, label="templates"];
+    translator_py -> providers_py [color=green, penwidth=2, label="provider factory"];
+    providers_py -> config_py [color=green, label="model validation"];
 
     // Configuration dependencies
     cost_py -> config_py [color=green, label="model info"];
@@ -162,8 +166,9 @@ digraph TranslatorArchitecture {
     // EXTERNAL DEPENDENCIES (gray)
     // ==========================================
 
-    // Core external deps
-    translator_py -> openai [color=gray, label="API calls"];
+    // Core external deps (via providers)
+    providers_py -> openai [color=gray, label="OpenAI API"];
+    providers_py -> anthropic [color=gray, label="Anthropic API"];
     log_interpreter_py -> openai [color=gray, label="API calls"];
 
     // UI dependencies
@@ -193,6 +198,7 @@ digraph TranslatorArchitecture {
     // ==========================================
 
     test_translator -> translator_py [color=orange, style=dashed, label="tests"];
+    test_translator -> providers_py [color=orange, style=dashed, label="mocks"];
     test_cli -> cli_py [color=orange, style=dashed, label="tests"];
     test_cli -> file_handler_py [color=orange, style=dashed, label="tests"];
     test_cli -> frontmatter_handler_py [color=orange, style=dashed, label="tests"];
@@ -211,6 +217,7 @@ digraph TranslatorArchitecture {
     // ==========================================
 
     pyproject_toml -> openai [color=purple, style=dotted, label="declares"];
+    pyproject_toml -> anthropic [color=purple, style=dotted];
     pyproject_toml -> rich [color=purple, style=dotted];
     pyproject_toml -> tiktoken [color=purple, style=dotted];
     pyproject_toml -> frontmatter [color=purple, style=dotted];

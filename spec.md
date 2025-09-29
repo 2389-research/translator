@@ -22,10 +22,11 @@ User Input → Entry Point → CLI Orchestrator → Core Engine + Utilities → 
 1. **Entry Point Layer** - Application bootstrap and initialization
 2. **CLI Interface Layer** - User interaction and workflow orchestration
 3. **Core Translation Engine** - Translation logic and prompt management
-4. **Configuration & Cost Management** - Model settings and pricing
-5. **File & Content Processing** - I/O operations and format handling
-6. **Logging & Analysis** - Process tracking and reporting
-7. **External Dependencies** - Third-party integrations
+4. **Provider Abstraction Layer** - Multi-provider AI service integration
+5. **Configuration & Cost Management** - Model settings and pricing
+6. **File & Content Processing** - I/O operations and format handling
+7. **Logging & Analysis** - Process tracking and reporting
+8. **External Dependencies** - Third-party integrations
 
 ## Core Components
 
@@ -47,6 +48,7 @@ User Input → Entry Point → CLI Orchestrator → Core Engine + Utilities → 
   - User interface rendering (Rich terminal UI)
   - Error handling and user feedback
   - Configuration management
+  - Multi-provider client setup (OpenAI and Anthropic)
 - **Dependencies:** ALL internal modules + external UI libraries
 - **Architecture Role:** Fan-out coordinator with high coupling (appropriate for CLI)
 
@@ -55,12 +57,22 @@ User Input → Entry Point → CLI Orchestrator → Core Engine + Utilities → 
 #### `translator.py` - Translator (Core Logic)
 - **Purpose:** Core translation business logic
 - **Key Responsibilities:**
-  - OpenAI API integration
+  - Multi-provider AI integration via provider abstraction
   - Multi-stage translation process (translate → edit → critique → revise)
   - Streaming response handling
   - Error recovery and retry logic
-- **Dependencies:** prompts.py, openai, swarm
+- **Dependencies:** prompts.py, providers.py, openai, anthropic
 - **Interface:** Translation methods with callback support
+
+#### `providers.py` - Provider Abstraction Layer
+- **Purpose:** Multi-provider AI service abstraction
+- **Key Responsibilities:**
+  - Unified interface for OpenAI and Anthropic APIs
+  - Provider-specific API call handling
+  - Model prefix support (openai:model, anthropic:model)
+  - Response normalization across providers
+- **Dependencies:** openai, anthropic, config.py
+- **Architecture Role:** Provider abstraction and factory pattern
 
 #### `prompts.py` - Prompts (Templates)
 - **Purpose:** Centralized prompt template management
@@ -74,9 +86,10 @@ User Input → Entry Point → CLI Orchestrator → Core Engine + Utilities → 
 ### 4. Configuration & Cost Management
 
 #### `config.py` - ModelConfig (Models & Settings)
-- **Purpose:** Model configuration and settings management
+- **Purpose:** Multi-provider model configuration and settings management
 - **Key Responsibilities:**
-  - OpenAI model definitions and capabilities
+  - OpenAI and Anthropic model definitions with pricing and capabilities
+  - Provider detection and validation
   - Model-specific parameter management
   - Configuration validation
 - **Dependencies:** None
@@ -145,7 +158,8 @@ User Input → Entry Point → CLI Orchestrator → Core Engine + Utilities → 
 ### 7. External Dependencies
 
 #### Core API Integration
-- **openai** (>=1.78.1) - Primary AI API client
+- **openai** (>=1.78.1) - OpenAI API client
+- **anthropic** (>=0.25.0) - Anthropic Claude API client
 - **swarm** (from GitHub) - OpenAI extensions (future use)
 
 #### User Interface
@@ -239,7 +253,8 @@ translator --estimate-only          # Cost estimation only
 - `--critique-loops <n>` - Number of critique iterations (1-5)
 
 #### Environment Variables
-- `OPENAI_API_KEY` - Required API key
+- `OPENAI_API_KEY` - Required for OpenAI models
+- `ANTHROPIC_API_KEY` - Required for Anthropic models
 - `DEFAULT_MODEL` - Default model selection
 - `OUTPUT_DIR` - Default output directory
 - `LOG_LEVEL` - Logging verbosity
@@ -282,10 +297,22 @@ metadata, content = frontmatter_handler.extract_frontmatter(content)
 4. Alternative user directory (`~/.config/translator/.env`)
 
 ### Supported Models
-- **o3** - Advanced reasoning model (default)
-- **gpt-4o** - Optimized GPT-4 variant
-- **gpt-4** - Standard GPT-4 model
-- Additional models as supported by OpenAI API
+#### OpenAI Models
+- **gpt-5, gpt-5-mini, gpt-5-nano** - Latest GPT-5 series with advanced reasoning
+- **o3, o3-mini, o4-mini** - Reasoning-focused models
+- **gpt-4o, gpt-4o-mini, gpt-4-turbo, gpt-4** - GPT-4 series
+- **gpt-4.1, gpt-4.1-mini, gpt-4.1-nano** - Extended context models
+- **gpt-3.5-turbo** - Legacy model
+
+#### Anthropic Models
+- **claude-opus-4.1** - Most capable model (default)
+- **claude-sonnet-4** - Balanced performance and cost
+- **claude-3.5-haiku** - Fast and economical
+
+#### Model Selection
+- **Default:** claude-opus-4.1
+- **Prefix Support:** openai:model-name, anthropic:model-name
+- **Backward Compatibility:** Non-prefixed models auto-detect provider
 
 ### Cost Management
 - Real-time token counting
@@ -382,7 +409,7 @@ pytest.ini              # Test configuration
 
 ### Future Enhancements
 1. **Multi-file Processing** - Batch translation support
-2. **Additional AI Providers** - Anthropic, local models
+2. **Local AI Models** - Support for local LLM deployments
 3. **Translation Memory** - Caching and consistency
 4. **API Mode** - Web service deployment
 5. **Plugin System** - Custom prompt providers
