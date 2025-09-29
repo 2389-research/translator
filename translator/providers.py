@@ -185,9 +185,11 @@ class AnthropicProvider(AIProvider):
                         if token_callback:
                             token_callback(1)  # Approximate token count
                     elif chunk.type == 'message_start':
-                        total_input_tokens = chunk.message.usage.input_tokens
+                        if hasattr(chunk.message, 'usage'):
+                            total_input_tokens = chunk.message.usage.input_tokens
                     elif chunk.type == 'message_delta':
-                        total_output_tokens = chunk.delta.usage.output_tokens
+                        if hasattr(chunk, 'usage'):
+                            total_output_tokens = chunk.usage.output_tokens
 
             usage_dict = {
                 'prompt_tokens': total_input_tokens,

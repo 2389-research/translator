@@ -270,57 +270,22 @@ class TranslatorCLI:
                 load_dotenv(env_path)
                 api_key = os.getenv("OPENAI_API_KEY")
             
-            # If still no API key, try ~/.config/translator/.env
+            # If still no API key, try XDG_CONFIG_HOME/translator/.env
             if not api_key:
-                config_dir = os.path.join(home_dir, ".config", "translator")
+                xdg_config_home = os.environ.get("XDG_CONFIG_HOME", os.path.join(home_dir, ".config"))
+                config_dir = os.path.join(xdg_config_home, "translator")
                 env_path = os.path.join(config_dir, ".env")
-                
+
                 if os.path.exists(env_path):
                     load_dotenv(env_path)
                     api_key = os.getenv("OPENAI_API_KEY")
 
-        # If still no API key, provide helpful error message
-        if not api_key:
-            console.print(
-                "[bold red]Error:[/] OPENAI_API_KEY not found in environment variables or .env files."
-            )
-            console.print(
-                "Please set your OpenAI API key in one of the following locations:"
-            )
-            console.print("1. Environment variable: export OPENAI_API_KEY=your_api_key")
-            console.print("2. Current directory .env file")
-            console.print("3. ~/.translator/.env file")
-            console.print("4. ~/.config/translator/.env file")
-            
-            # Offer to create the config directory and a template .env file
-            home_dir = os.path.expanduser("~")
-            translator_dir = os.path.join(home_dir, ".translator")
-            
-            if not os.path.exists(translator_dir):
-                if cls.confirm("Would you like to create a config directory at ~/.translator?"):
-                    try:
-                        os.makedirs(translator_dir, exist_ok=True)
-                        env_path = os.path.join(translator_dir, ".env")
-                        with open(env_path, "w") as f:
-                            f.write("# OpenAI API Key (required)\n")
-                            f.write("OPENAI_API_KEY=your_openai_api_key_here\n\n")
-                            f.write("# Anthropic API Key (optional, for Claude models)\n")
-                            f.write("# ANTHROPIC_API_KEY=your_anthropic_api_key_here\n\n")
-                            f.write("# Default model (optional, defaults to claude-opus-4.1)\n")
-                            f.write("# DEFAULT_MODEL=claude-opus-4.1\n\n")
-                            f.write("# Output directory (defaults to same location as input file)\n")
-                            f.write("# OUTPUT_DIR=/path/to/output/directory\n\n")
-                            f.write("# Log level (defaults to INFO)\n")
-                            f.write("# LOG_LEVEL=INFO  # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL\n")
-                        
-                        console.print(f"[bold green]Created config template at:[/] {env_path}")
-                        console.print("Please edit this file to add your API keys.")
-                    except Exception as e:
-                        console.print(f"[bold red]Failed to create config directory:[/] {str(e)}")
-                
-            sys.exit(1)
+        # Return OpenAI client if API key is found, otherwise return None
+        if api_key:
+            return openai.OpenAI(api_key=api_key)
 
-        return openai.OpenAI(api_key=api_key)
+        # OpenAI client not available, but that's OK if we have Anthropic
+        return None
 
     @classmethod
     def setup_anthropic_client(cls) -> Optional[anthropic.Anthropic]:
@@ -518,20 +483,28 @@ class TranslatorCLI:
     @staticmethod
     def get_config_paths() -> list:
         """Get a list of possible configuration file paths.
-        
+
         Returns:
             A list of possible configuration file paths in order of precedence.
         """
         paths = []
-        
+
         # Current directory
         paths.append(os.path.join(os.getcwd(), ".env"))
-        
+
         # User config directories
         home_dir = os.path.expanduser("~")
         paths.append(os.path.join(home_dir, ".translator", ".env"))
-        paths.append(os.path.join(home_dir, ".config", "translator", ".env"))
-        
+
+        # XDG Base Directory Specification support
+        xdg_config_home = os.environ.get("XDG_CONFIG_HOME", os.path.join(home_dir, ".config"))
+        paths.append(os.path.join(xdg_config_home, "translator", ".env"))
+
+        # Legacy ~/.config location (if different from XDG_CONFIG_HOME)
+        legacy_config = os.path.join(home_dir, ".config", "translator", ".env")
+        if legacy_config not in paths:
+            paths.append(legacy_config)
+
         return paths
     
     @classmethod
@@ -582,19 +555,33 @@ class TranslatorCLI:
         
         # Collect configuration values
         config = {}
-        
-        # OpenAI API Key (required)
-        console.print("\n[bold]OpenAI API Key (required)[/]")
-        api_key = input("Enter your OpenAI API key: ").strip()
-        if not api_key:
-            console.print("[bold red]Error:[/] API key is required.")
+
+        # OpenAI API Key (optional but recommended)
+        console.print("\n[bold]API Keys Configuration[/]")
+        console.print("You can configure one or both API providers:")
+        console.print("• OpenAI: For GPT models (gpt-4o, gpt-4o-mini, o3, etc.)")
+        console.print("• Anthropic: For Claude models (claude-3-haiku-20240307, claude-3-5-sonnet-20241022, etc.)")
+
+        console.print("\n[bold]OpenAI API Key (recommended)[/]")
+        openai_key = input("Enter your OpenAI API key (or press Enter to skip): ").strip()
+        if openai_key:
+            config["OPENAI_API_KEY"] = openai_key
+
+        # Anthropic API Key (optional)
+        console.print("\n[bold]Anthropic API Key (for Claude models)[/]")
+        anthropic_key = input("Enter your Anthropic API key (or press Enter to skip): ").strip()
+        if anthropic_key:
+            config["ANTHROPIC_API_KEY"] = anthropic_key
+
+        # Check that at least one API key was provided
+        if not openai_key and not anthropic_key:
+            console.print("[bold red]Error:[/] At least one API key is required.")
             return
-        config["OPENAI_API_KEY"] = api_key
         
         # Default model (optional)
-        console.print("\n[bold]Default Model (optional, default: claude-opus-4.1)[/]")
+        console.print("\n[bold]Default Model (optional, default: gpt-4o-mini)[/]")
         console.print("Available models: " + ", ".join(ModelConfig.MODELS.keys()))
-        default_model = input("Enter your preferred default model (or press Enter for claude-opus-4.1): ").strip()
+        default_model = input("Enter your preferred default model (or press Enter for gpt-4o-mini): ").strip()
         if default_model:
             if default_model in ModelConfig.MODELS:
                 config["DEFAULT_MODEL"] = default_model
@@ -606,14 +593,21 @@ class TranslatorCLI:
             with open(selected_path, "w") as f:
                 for key, value in config.items():
                     f.write(f"{key}={value}\n")
-                
+
+                # Add comments for missing API keys
+                f.write("\n# API Keys for different providers:")
+                if "OPENAI_API_KEY" not in config:
+                    f.write("\n# OPENAI_API_KEY=your_openai_api_key_here")
+                if "ANTHROPIC_API_KEY" not in config:
+                    f.write("\n# ANTHROPIC_API_KEY=your_anthropic_api_key_here")
+
                 # Add comments for documentation
                 if "DEFAULT_MODEL" not in config:
-                    f.write("\n# Default model (uncomment to change)\n# DEFAULT_MODEL=claude-opus-4.1\n")
-                
+                    f.write("\n\n# Default model (uncomment to change)\n# DEFAULT_MODEL=gpt-4o-mini\n")
+
                 # Include comment about output directory but don't prompt for it
                 f.write("\n# Output directory (defaults to same location as input file)\n# OUTPUT_DIR=/path/to/output/directory\n")
-                
+
                 # Include comment about log level but don't prompt for it
                 f.write("\n# Log level (defaults to INFO)\n# LOG_LEVEL=INFO  # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL\n")
             
@@ -655,7 +649,7 @@ class TranslatorCLI:
         parser.add_argument("language", nargs='?', help="Target language for translation")
         parser.add_argument("-o", "--output", help="Output file path (optional)")
         parser.add_argument(
-            "-m", "--model", default="claude-opus-4.1", help="AI model to use (default: claude-opus-4.1)"
+            "-m", "--model", default="o3", help="AI model to use (default: o3)"
         )
         parser.add_argument(
             "--no-edit",
@@ -1043,7 +1037,8 @@ class TranslatorCLI:
             
             # Show final count and elapsed time
             elapsed_time = token_display.get_elapsed_time()
-            console.print(f"[bold green]Translation complete![/] Received [bold]{translation_usage['completion_tokens']:,}[/] tokens in [bold magenta]{elapsed_time}[/]")
+            completion_tokens = translation_usage.get('completion_tokens', 0)
+            console.print(f"[bold green]Translation complete![/] Received [bold]{completion_tokens:,}[/] tokens in [bold magenta]{elapsed_time}[/]")
         else:
             # Traditional progress spinner (non-streaming)
             with Progress(
@@ -1524,10 +1519,11 @@ class TranslatorCLI:
 
         console.print(f"[bold]Actual cost:[/] {cost_str}")
 
-        # Generate narrative interpretation
-        cls._generate_narrative(
-            client=translator.client, log_data=log_data, output_path=output_path
-        )
+        # Generate narrative interpretation (only if OpenAI client is available)
+        if translator.openai_client:
+            cls._generate_narrative(
+                client=translator.openai_client, log_data=log_data, output_path=output_path
+            )
 
     @classmethod
     def _generate_narrative(
@@ -1805,6 +1801,21 @@ class TranslatorCLI:
         # Set up OpenAI and Anthropic clients
         openai_client = cls.setup_openai_client()
         anthropic_client = cls.setup_anthropic_client()
+
+        # Check that at least one client is available
+        if not openai_client and not anthropic_client:
+            console.print("[bold red]Error:[/] No API keys found. At least one API key is required.")
+            console.print("\nPlease configure your API keys using one of these methods:")
+            console.print("1. Run: [bold cyan]translator config[/]")
+            console.print("2. Set environment variables:")
+            console.print("   - export OPENAI_API_KEY=your_openai_api_key")
+            console.print("   - export ANTHROPIC_API_KEY=your_anthropic_api_key")
+            console.print("3. Create a .env file in one of these locations:")
+            console.print("   - Current directory")
+            console.print("   - ~/.translator/.env")
+            console.print("   - $XDG_CONFIG_HOME/translator/.env")
+            sys.exit(1)
+
         translator = Translator(openai_client=openai_client, anthropic_client=anthropic_client)
 
         # Translate the file

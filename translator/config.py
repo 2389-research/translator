@@ -10,29 +10,78 @@ class ModelConfig:
 
     # Model configuration: max_tokens and cost per 1k tokens (input/output)
     MODELS: Dict[str, Dict[str, Any]] = {
-        # Anthropic Claude Series (2025)
-        "claude-opus-4.1": {
+        # Anthropic Claude 4 Series
+        "claude-sonnet-4-5-20250929": {
             "provider": "anthropic",
             "max_tokens": 200000,  # 200K context window
-            "output_tokens": 64000,  # Up to 64K output
+            "output_tokens": 8192,  # Up to 8K output
+            "input_cost": 0.004,  # $4.00 / 1M tokens (estimated)
+            "output_cost": 0.024,  # $24.00 / 1M tokens (estimated)
+            "capabilities": ["multimodal", "computer_use", "function_calling"]
+        },
+        "claude-sonnet-4-20250514": {
+            "provider": "anthropic",
+            "max_tokens": 200000,  # 200K context window
+            "output_tokens": 8192,  # Up to 8K output
+            "input_cost": 0.004,  # $4.00 / 1M tokens (estimated)
+            "output_cost": 0.024,  # $24.00 / 1M tokens (estimated)
+            "capabilities": ["multimodal", "computer_use", "function_calling"]
+        },
+        "claude-opus-4-1-20250805": {
+            "provider": "anthropic",
+            "max_tokens": 200000,  # 200K context window
+            "output_tokens": 4096,  # Up to 4K output
             "input_cost": 0.015,  # $15.00 / 1M tokens
             "output_cost": 0.075,  # $75.00 / 1M tokens
-            "capabilities": ["multimodal", "computer_use", "function_calling", "extended_thinking"]
+            "capabilities": ["multimodal", "function_calling"]
         },
-        "claude-sonnet-4": {
+        "claude-opus-4-20250514": {
             "provider": "anthropic",
-            "max_tokens": 200000,
-            "output_tokens": 64000,
-            "input_cost": 0.003,  # $3.00 / 1M tokens
-            "output_cost": 0.015,  # $15.00 / 1M tokens
-            "capabilities": ["multimodal", "computer_use", "function_calling", "extended_thinking"]
+            "max_tokens": 200000,  # 200K context window
+            "output_tokens": 4096,  # Up to 4K output
+            "input_cost": 0.015,  # $15.00 / 1M tokens
+            "output_cost": 0.075,  # $75.00 / 1M tokens
+            "capabilities": ["multimodal", "function_calling"]
         },
-        "claude-3.5-haiku": {
+        # Anthropic Claude 3 Series
+        "claude-3-opus-latest": {
+            "provider": "anthropic",
+            "max_tokens": 200000,  # 200K context window
+            "output_tokens": 4096,  # Up to 4K output
+            "input_cost": 0.015,  # $15.00 / 1M tokens
+            "output_cost": 0.075,  # $75.00 / 1M tokens
+            "capabilities": ["multimodal", "function_calling"]
+        },
+        "claude-3-opus-20240229": {
+            "provider": "anthropic",
+            "max_tokens": 200000,  # 200K context window
+            "output_tokens": 4096,  # Up to 4K output
+            "input_cost": 0.015,  # $15.00 / 1M tokens
+            "output_cost": 0.075,  # $75.00 / 1M tokens
+            "capabilities": ["multimodal", "function_calling"]
+        },
+        "claude-3-5-sonnet-latest": {
             "provider": "anthropic",
             "max_tokens": 200000,
             "output_tokens": 8192,
-            "input_cost": 0.0008,  # $0.80 / 1M tokens
-            "output_cost": 0.004,  # $4.00 / 1M tokens
+            "input_cost": 0.003,  # $3.00 / 1M tokens
+            "output_cost": 0.015,  # $15.00 / 1M tokens
+            "capabilities": ["multimodal", "computer_use", "function_calling"]
+        },
+        "claude-3-5-sonnet-20241022": {
+            "provider": "anthropic",
+            "max_tokens": 200000,
+            "output_tokens": 8192,
+            "input_cost": 0.003,  # $3.00 / 1M tokens
+            "output_cost": 0.015,  # $15.00 / 1M tokens
+            "capabilities": ["multimodal", "computer_use", "function_calling"]
+        },
+        "claude-3-haiku-20240307": {
+            "provider": "anthropic",
+            "max_tokens": 200000,
+            "output_tokens": 4096,
+            "input_cost": 0.00025,  # $0.25 / 1M tokens
+            "output_cost": 0.00125,  # $1.25 / 1M tokens
             "capabilities": ["multimodal", "function_calling"]
         },
         # GPT-5 Series (Released August 2025)
