@@ -103,7 +103,7 @@ def test_edit_translation(mock_provider_factory, translator_instance):
     """Test the edit_translation method."""
     # Mock the provider and its response
     mock_provider = MagicMock()
-    mock_provider.translate_text.return_value = (
+    mock_provider.complete.return_value = (
         "Texto mejorado en español.",
         {"prompt_tokens": 15, "completion_tokens": 25, "total_tokens": 40},
         None
@@ -138,7 +138,7 @@ def test_critique_translation(mock_provider_factory, translator_instance):
     # Mock the provider and its response
     mock_provider = MagicMock()
     critique = "La traducción necesita mejoras en el tono y la naturalidad."
-    mock_provider.translate_text.return_value = (
+    mock_provider.complete.return_value = (
         critique,
         {"prompt_tokens": 20, "completion_tokens": 30, "total_tokens": 50},
         None
@@ -174,7 +174,7 @@ def test_apply_critique_feedback(mock_provider_factory, translator_instance):
     # Mock the provider and its response
     mock_provider = MagicMock()
     improved_text = "Texto mejorado basado en la crítica."
-    mock_provider.translate_text.return_value = (
+    mock_provider.complete.return_value = (
         improved_text,
         {"prompt_tokens": 25, "completion_tokens": 35, "total_tokens": 60},
         None

@@ -150,12 +150,8 @@ class Translator:
                 anthropic_client=self.anthropic_client
             )
 
-            # Create custom prompt that combines user and text content
-            edit_text = f"Edit this translation to improve fluency and accuracy:\n\nOriginal: {original_text}\n\nTranslation: {translated_text}"
-
-            edited_text, usage, error = provider.translate_text(
-                text=edit_text,
-                target_language=target_language,
+            edited_text, usage, error = provider.complete(
+                user_prompt=user_prompt,
                 model=model,
                 system_prompt=system_prompt,
                 stream=stream,
@@ -224,12 +220,8 @@ class Translator:
                 anthropic_client=self.anthropic_client
             )
 
-            # Create critique text that includes both original and translation
-            critique_text = f"Critique this translation:\n\nOriginal: {original_text}\n\nTranslation: {translated_text}"
-
-            critique_feedback, usage, error = provider.translate_text(
-                text=critique_text,
-                target_language=target_language,
+            critique_feedback, usage, error = provider.complete(
+                user_prompt=user_prompt,
                 model=model,
                 system_prompt=system_prompt,
                 stream=stream,
@@ -307,12 +299,8 @@ class Translator:
                 anthropic_client=self.anthropic_client
             )
 
-            # Create feedback text that includes original, translation, and critique
-            feedback_text = f"Apply this feedback to improve the translation:\n\nOriginal: {original_text}\n\nTranslation: {translated_text}\n\nFeedback: {critique_feedback}"
-
-            improved_text, usage, error = provider.translate_text(
-                text=feedback_text,
-                target_language=target_language,
+            improved_text, usage, error = provider.complete(
+                user_prompt=user_prompt,
                 model=model,
                 system_prompt=system_prompt,
                 stream=stream,

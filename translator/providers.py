@@ -29,6 +29,19 @@ class AIProvider(ABC):
         pass
 
     @abstractmethod
+    def complete(
+        self,
+        user_prompt: str,
+        model: str,
+        system_prompt: str,
+        stream: bool = False,
+        cancellation_handler=None,
+        token_callback=None
+    ) -> Tuple[Optional[str], Dict, Optional[str]]:
+        """Generic completion - sends user_prompt directly without modification."""
+        pass
+
+    @abstractmethod
     def is_supported_model(self, model: str) -> bool:
         """Check if the model is supported by this provider."""
         pass
@@ -119,6 +132,39 @@ class OpenAIProvider(AIProvider):
             }
 
             return translated_text, usage_dict, None
+
+        except Exception as e:
+            return None, {}, str(e)
+
+    def complete(
+        self,
+        user_prompt: str,
+        model: str,
+        system_prompt: str,
+        stream: bool = False,
+        cancellation_handler=None,
+        token_callback=None
+    ) -> Tuple[Optional[str], Dict, Optional[str]]:
+        """Generic completion - sends user_prompt directly without modification."""
+        try:
+            actual_model = model.split(":", 1)[-1] if ":" in model else model
+
+            params = {
+                "model": actual_model,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                "stream": stream
+            }
+
+            if actual_model != "o3":
+                params["temperature"] = 0.7
+
+            if stream:
+                return self._handle_streaming_response(params, cancellation_handler, token_callback)
+            else:
+                return self._handle_non_streaming_response(params)
 
         except Exception as e:
             return None, {}, str(e)
@@ -215,6 +261,36 @@ class AnthropicProvider(AIProvider):
             }
 
             return translated_text, usage_dict, None
+
+        except Exception as e:
+            return None, {}, str(e)
+
+    def complete(
+        self,
+        user_prompt: str,
+        model: str,
+        system_prompt: str,
+        stream: bool = False,
+        cancellation_handler=None,
+        token_callback=None
+    ) -> Tuple[Optional[str], Dict, Optional[str]]:
+        """Generic completion - sends user_prompt directly without modification."""
+        try:
+            actual_model = model.split(":", 1)[-1] if ":" in model else model
+
+            params = {
+                "model": actual_model,
+                "max_tokens": 4096,
+                "system": system_prompt,
+                "messages": [
+                    {"role": "user", "content": user_prompt}
+                ]
+            }
+
+            if stream:
+                return self._handle_streaming_response(params, cancellation_handler, token_callback)
+            else:
+                return self._handle_non_streaming_response(params)
 
         except Exception as e:
             return None, {}, str(e)
