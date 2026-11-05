@@ -11,7 +11,7 @@ def test_estimate_cost_basic():
     """Test basic cost estimation."""
     # Call the method with basic parameters
     token_count = 1000
-    model = "gpt-4"
+    model = "gpt-6.1-sol"
 
     # Get estimated cost
     cost, cost_str = CostEstimator.estimate_cost(token_count, model)
@@ -28,20 +28,18 @@ def test_estimate_cost_with_different_models():
     token_count = 1000
 
     # Test with multiple models to ensure they give different estimates
-    cost_gpt4, _ = CostEstimator.estimate_cost(token_count, "gpt-4")
-    cost_gpt35, _ = CostEstimator.estimate_cost(token_count, "gpt-3.5-turbo")
-    cost_o3, _ = CostEstimator.estimate_cost(token_count, "o3")
+    cost_astra, _ = CostEstimator.estimate_cost(token_count, "gpt-6-astra")
+    cost_sol, _ = CostEstimator.estimate_cost(token_count, "gpt-6.1-sol")
+    cost_haiku, _ = CostEstimator.estimate_cost(token_count, "claude-haiku-5-5")
 
     # Different models should have different costs
-    assert cost_gpt4 != cost_gpt35
-    assert cost_o3 != cost_gpt4
-    assert cost_o3 != cost_gpt35
+    assert cost_astra > cost_sol > cost_haiku
 
 
 def test_estimate_cost_with_editing():
     """Test cost estimation with editing enabled."""
     token_count = 1000
-    model = "gpt-4"
+    model = "gpt-6.1-sol"
 
     # Get cost with editing enabled/disabled
     cost_with_edit, _ = CostEstimator.estimate_cost(token_count, model, with_edit=True)
@@ -56,7 +54,7 @@ def test_estimate_cost_with_editing():
 def test_estimate_cost_with_critique():
     """Test cost estimation with critique enabled."""
     token_count = 1000
-    model = "gpt-4"
+    model = "gpt-6.1-sol"
 
     # Get cost with critique enabled/disabled
     cost_with_critique, _ = CostEstimator.estimate_cost(
@@ -73,7 +71,7 @@ def test_estimate_cost_with_critique():
 def test_estimate_cost_with_multiple_critique_loops():
     """Test cost estimation with multiple critique loops."""
     token_count = 1000
-    model = "gpt-4"
+    model = "gpt-6.1-sol"
 
     # Get cost with different numbers of critique loops
     cost_1_loop, _ = CostEstimator.estimate_cost(
@@ -94,7 +92,7 @@ def test_estimate_cost_with_multiple_critique_loops():
 def test_estimate_cost_zero_loops():
     """Test cost estimation with zero critique loops."""
     token_count = 1000
-    model = "gpt-4"
+    model = "gpt-6.1-sol"
 
     # With zero critique loops, should be the same as with_critique=False
     cost_with_zero_loops, _ = CostEstimator.estimate_cost(
@@ -111,7 +109,7 @@ def test_estimate_cost_zero_loops():
 def test_estimate_cost_with_all_options():
     """Test cost estimation with all options enabled."""
     token_count = 1000
-    model = "gpt-4"
+    model = "gpt-6.1-sol"
 
     # Get cost with all options
     cost, cost_str = CostEstimator.estimate_cost(
@@ -148,7 +146,7 @@ def test_estimate_cost_with_mock_costs():
 def test_estimate_cost_small_amount_formatting():
     """Test formatting of very small cost estimates."""
     token_count = 10  # Very small token count
-    model = "gpt-3.5-turbo"  # Cheapest model
+    model = "claude-haiku-5-5"  # Cheapest model
 
     # Mock to ensure we get a very small cost
     with patch.object(ModelConfig, "get_input_cost", return_value=0.0001):
@@ -168,7 +166,7 @@ def test_calculate_actual_cost():
         "completion_tokens": 500,
         "total_tokens": 1500,  # This is ignored by the calculation
     }
-    model = "gpt-4"
+    model = "gpt-6.1-sol"
 
     # Calculate actual cost
     cost, cost_str = CostEstimator.calculate_actual_cost(usage, model)
@@ -184,14 +182,12 @@ def test_calculate_actual_cost_with_different_models():
     usage = {"prompt_tokens": 1000, "completion_tokens": 500}
 
     # Calculate costs for different models
-    cost_gpt4, _ = CostEstimator.calculate_actual_cost(usage, "gpt-4")
-    cost_gpt35, _ = CostEstimator.calculate_actual_cost(usage, "gpt-3.5-turbo")
-    cost_o3, _ = CostEstimator.calculate_actual_cost(usage, "o3")
+    cost_astra, _ = CostEstimator.calculate_actual_cost(usage, "gpt-6-astra")
+    cost_sol, _ = CostEstimator.calculate_actual_cost(usage, "gpt-6.1-sol")
+    cost_haiku, _ = CostEstimator.calculate_actual_cost(usage, "claude-haiku-5-5")
 
     # Different models should have different costs
-    assert cost_gpt4 != cost_gpt35
-    assert cost_o3 != cost_gpt4
-    assert cost_o3 != cost_gpt35
+    assert cost_astra > cost_sol > cost_haiku
 
 
 def test_calculate_actual_cost_with_mock_costs():
@@ -214,7 +210,7 @@ def test_calculate_actual_cost_with_mock_costs():
 def test_calculate_actual_cost_small_amount_formatting():
     """Test formatting of very small actual costs."""
     usage = {"prompt_tokens": 10, "completion_tokens": 5}
-    model = "gpt-3.5-turbo"  # Cheapest model
+    model = "claude-haiku-5-5"  # Cheapest model
 
     # Mock to ensure we get a very small cost
     with patch.object(ModelConfig, "get_input_cost", return_value=0.0001):

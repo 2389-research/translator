@@ -73,6 +73,7 @@ class Prompts:
         10. If the text contains idioms or colloquialisms, translate them into the target language while maintaining their original meaning.
         11. If the text contains technical terms or jargon, ensure that the translation is accurate and appropriate for the target audience, if there isn't a natural translation, keep it in the original language.
         12. If there is not natural translation, keep it in the original language.
+        13. Output only the edited text. Never list, describe, or explain your changes.
         """
 
     @staticmethod
@@ -166,6 +167,7 @@ Your task is to improve a translation based on detailed critique feedback.
 4. Ensure the translation is accurate, natural-sounding, and faithful to the original
 5. Preserve all formatting, markdown, and structure of the original text
 6. Make sure the final text reads as if it were originally written in {target_language}
+7. Output only the improved translation. Never list, describe, or explain your changes.
 
 Do not ignore any of the critique points. Every issue identified must be addressed in your improved version.
 """

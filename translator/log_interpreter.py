@@ -9,6 +9,7 @@ from typing import Dict, Optional
 import openai
 from rich.console import Console
 from rich.markup import escape
+from translator.config import ModelConfig
 
 console = Console()
 
@@ -43,12 +44,12 @@ class LogInterpreter:
             )
             return None
 
-    def generate_narrative(self, log_data: Dict, model: str = "o4-mini", stream: bool = False, cancellation_handler=None) -> str:
+    def generate_narrative(self, log_data: Dict, model: str = ModelConfig.DEFAULT_MODEL, stream: bool = False, cancellation_handler=None) -> str:
         """Generate a narrative interpretation of the translation log.
 
         Args:
             log_data: The log data dictionary
-            model: The model to use for interpretation (default: o4-mini)
+            model: The model to use for interpretation (default: ModelConfig.DEFAULT_MODEL)
             stream: Whether to stream responses (default: False)
             cancellation_handler: Optional handler to check for cancellation requests
 

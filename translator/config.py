@@ -1,202 +1,68 @@
 #!/usr/bin/env python3
-# ABOUTME: Configuration for OpenAI models including token limits and pricing.
+# ABOUTME: Configuration for OpenAI and Anthropic models including token limits and pricing.
 # ABOUTME: Used for estimating costs and checking model capabilities.
 
 from typing import Dict, Any, List
 
 
 class ModelConfig:
-    """Configuration for OpenAI models including token limits and pricing."""
+    """Configuration for OpenAI and Anthropic models including token limits and pricing."""
 
-    # Model configuration: max_tokens and cost per 1k tokens (input/output)
+    # The model used when neither -m nor DEFAULT_MODEL is given
+    DEFAULT_MODEL = "gpt-6.1-sol"
+
+    # Model configuration: max_tokens is the context window, output_tokens the
+    # per-response limit, and costs are per 1k tokens (input/output)
     MODELS: Dict[str, Dict[str, Any]] = {
-        # Anthropic Claude 4 Series
-        "claude-sonnet-4-5-20250929": {
+        # Anthropic Claude 5 series: 1M context, 128K output, adaptive thinking always on
+        "claude-fable-5-1": {
             "provider": "anthropic",
-            "max_tokens": 200000,  # 200K context window
-            "output_tokens": 8192,  # Up to 8K output
-            "input_cost": 0.004,  # $4.00 / 1M tokens (estimated)
-            "output_cost": 0.024,  # $24.00 / 1M tokens (estimated)
-            "capabilities": ["multimodal", "computer_use", "function_calling"]
+            "max_tokens": 1000000,  # 1M context window
+            "output_tokens": 128000,  # 128K output, shared with thinking
+            "input_cost": 0.01,  # $10.00 / 1M tokens
+            "output_cost": 0.05,  # $50.00 / 1M tokens
+            "capabilities": ["multimodal", "function_calling", "adaptive_thinking"]
         },
-        "claude-sonnet-4-20250514": {
+        "claude-opus-5-5": {
             "provider": "anthropic",
-            "max_tokens": 200000,  # 200K context window
-            "output_tokens": 8192,  # Up to 8K output
-            "input_cost": 0.004,  # $4.00 / 1M tokens (estimated)
-            "output_cost": 0.024,  # $24.00 / 1M tokens (estimated)
-            "capabilities": ["multimodal", "computer_use", "function_calling"]
-        },
-        "claude-opus-4-1-20250805": {
-            "provider": "anthropic",
-            "max_tokens": 200000,  # 200K context window
-            "output_tokens": 4096,  # Up to 4K output
-            "input_cost": 0.015,  # $15.00 / 1M tokens
-            "output_cost": 0.075,  # $75.00 / 1M tokens
-            "capabilities": ["multimodal", "function_calling"]
-        },
-        "claude-opus-4-20250514": {
-            "provider": "anthropic",
-            "max_tokens": 200000,  # 200K context window
-            "output_tokens": 4096,  # Up to 4K output
-            "input_cost": 0.015,  # $15.00 / 1M tokens
-            "output_cost": 0.075,  # $75.00 / 1M tokens
-            "capabilities": ["multimodal", "function_calling"]
-        },
-        # Anthropic Claude 3 Series
-        "claude-3-opus-latest": {
-            "provider": "anthropic",
-            "max_tokens": 200000,  # 200K context window
-            "output_tokens": 4096,  # Up to 4K output
-            "input_cost": 0.015,  # $15.00 / 1M tokens
-            "output_cost": 0.075,  # $75.00 / 1M tokens
-            "capabilities": ["multimodal", "function_calling"]
-        },
-        "claude-3-opus-20240229": {
-            "provider": "anthropic",
-            "max_tokens": 200000,  # 200K context window
-            "output_tokens": 4096,  # Up to 4K output
-            "input_cost": 0.015,  # $15.00 / 1M tokens
-            "output_cost": 0.075,  # $75.00 / 1M tokens
-            "capabilities": ["multimodal", "function_calling"]
-        },
-        "claude-3-5-sonnet-latest": {
-            "provider": "anthropic",
-            "max_tokens": 200000,
-            "output_tokens": 8192,
-            "input_cost": 0.003,  # $3.00 / 1M tokens
-            "output_cost": 0.015,  # $15.00 / 1M tokens
-            "capabilities": ["multimodal", "computer_use", "function_calling"]
-        },
-        "claude-3-5-sonnet-20241022": {
-            "provider": "anthropic",
-            "max_tokens": 200000,
-            "output_tokens": 8192,
-            "input_cost": 0.003,  # $3.00 / 1M tokens
-            "output_cost": 0.015,  # $15.00 / 1M tokens
-            "capabilities": ["multimodal", "computer_use", "function_calling"]
-        },
-        "claude-3-haiku-20240307": {
-            "provider": "anthropic",
-            "max_tokens": 200000,
-            "output_tokens": 4096,
-            "input_cost": 0.00025,  # $0.25 / 1M tokens
-            "output_cost": 0.00125,  # $1.25 / 1M tokens
-            "capabilities": ["multimodal", "function_calling"]
-        },
-        # GPT-5 Series (Released August 2025)
-        "gpt-5": {
-            "provider": "openai",
-            "max_tokens": 272000,  # 272K input tokens
-            "output_tokens": 128000,  # 128K output tokens (including reasoning)
-            "input_cost": 0.00125,  # $1.25 / 1M tokens
-            "output_cost": 0.01,  # $10.00 / 1M tokens
-            "capabilities": ["multimodal", "reasoning_levels", "function_calling", "structured_outputs"]
-        },
-        "gpt-5-mini": {
-            "provider": "openai",
-            "max_tokens": 272000,
+            "max_tokens": 1000000,
             "output_tokens": 128000,
-            "input_cost": 0.0005,  # Estimated - competitive with gpt-4o-mini
-            "output_cost": 0.002,  # Estimated
-            "capabilities": ["multimodal", "reasoning_levels", "function_calling"]
-        },
-        "gpt-5-nano": {
-            "provider": "openai",
-            "max_tokens": 272000,
-            "output_tokens": 128000,
-            "input_cost": 0.0002,  # Estimated - ultra-competitive
-            "output_cost": 0.0008,  # Estimated
-            "capabilities": ["function_calling", "structured_outputs"]
-        },
-
-        # o3/o4 Reasoning Series (2025)
-        "o3": {
-            "provider": "openai",
-            "max_tokens": 128000,
-            "input_cost": 0.0011,  # $1.10 / 1M tokens (2025 pricing)
-            "output_cost": 0.0044,  # $4.40 / 1M tokens
-            "capabilities": ["reasoning_effort", "function_calling", "structured_outputs"]
-        },
-        "o3-mini": {
-            "provider": "openai",
-            "max_tokens": 64000,
-            "input_cost": 0.00015,  # ~90% cheaper than o3
-            "output_cost": 0.0006,
-            "capabilities": ["reasoning_effort", "function_calling", "structured_outputs"]
-        },
-        "o4-mini": {
-            "provider": "openai",
-            "max_tokens": 200000,
-            "input_cost": 0.00015,  # $0.15 / 1M tokens
-            "output_cost": 0.0006,  # $0.60 / 1M tokens
-            "capabilities": ["reasoning_effort", "function_calling", "structured_outputs"]
-        },
-
-        # Legacy o-series
-        "o1-pro": {
-            "provider": "openai",
-            "max_tokens": 200000,
-            "input_cost": 0.15,  # $150.00 / 1M tokens
-            "output_cost": 0.60,  # $600.00 / 1M tokens
-        },
-
-        # GPT-4 Series
-        "gpt-4o": {
-            "provider": "openai",
-            "max_tokens": 128000,
-            "input_cost": 0.005,  # $5.00 / 1M tokens
+            "input_cost": 0.004,  # $4.00 / 1M tokens
             "output_cost": 0.02,  # $20.00 / 1M tokens
+            "capabilities": ["multimodal", "function_calling", "adaptive_thinking"]
         },
-        "gpt-4o-mini": {
-            "provider": "openai",
-            "max_tokens": 128000,
-            "input_cost": 0.00015,  # $0.15 / 1M tokens
-            "output_cost": 0.0006,  # $0.60 / 1M tokens
-        },
-        "gpt-4-turbo": {
-            "provider": "openai",
-            "max_tokens": 128000,
-            "input_cost": 0.01,  # $10.00 / 1M tokens
-            "output_cost": 0.03,  # $30.00 / 1M tokens
-        },
-        "gpt-4": {
-            "provider": "openai",
-            "max_tokens": 8192,
-            "input_cost": 0.03,  # $30.00 / 1M tokens
-            "output_cost": 0.06,  # $60.00 / 1M tokens
-        },
-        "gpt-4-vision-preview": {
-            "provider": "openai",
-            "max_tokens": 128000,
-            "input_cost": 0.01,  # $10.00 / 1M tokens
-            "output_cost": 0.03,  # $30.00 / 1M tokens
-        },
-        "gpt-4.1": {
-            "provider": "openai",
-            "max_tokens": 1048576,
+        "claude-sonnet-5-5": {
+            "provider": "anthropic",
+            "max_tokens": 1000000,
+            "output_tokens": 128000,
             "input_cost": 0.002,  # $2.00 / 1M tokens
-            "output_cost": 0.008,  # $8.00 / 1M tokens
+            "output_cost": 0.01,  # $10.00 / 1M tokens
+            "capabilities": ["multimodal", "function_calling", "adaptive_thinking"]
         },
-        "gpt-4.1-mini": {
-            "provider": "openai",
-            "max_tokens": 1048576,
-            "input_cost": 0.0004,  # $0.40 / 1M tokens
-            "output_cost": 0.0016,  # $1.60 / 1M tokens
+        "claude-haiku-5-5": {
+            "provider": "anthropic",
+            "max_tokens": 1000000,
+            "output_tokens": 128000,
+            "input_cost": 0.0001,  # $0.10 / 1M tokens for prompts up to 100K ($0.50 beyond)
+            "output_cost": 0.0005,  # $0.50 / 1M tokens for prompts up to 100K ($2.50 beyond)
+            "capabilities": ["multimodal", "function_calling", "adaptive_thinking"]
         },
-        "gpt-4.1-nano": {
+        # OpenAI GPT-6 series: 1.05M context (922K input), 128K output, reasoning effort
+        "gpt-6-astra": {
             "provider": "openai",
-            "max_tokens": 1048576,
-            "input_cost": 0.0001,  # $0.10 / 1M tokens
-            "output_cost": 0.0004,  # $0.40 / 1M tokens
+            "max_tokens": 1050000,  # 1.05M context window, 922K of it input
+            "output_tokens": 128000,
+            "input_cost": 0.01,  # $10.00 / 1M tokens (doubles above 272K input tokens)
+            "output_cost": 0.05,  # $50.00 / 1M tokens (1.5x above 272K input tokens)
+            "capabilities": ["reasoning_effort"]
         },
-
-        # Legacy GPT-3.5
-        "gpt-3.5-turbo": {
+        "gpt-6.1-sol": {
             "provider": "openai",
-            "max_tokens": 16385,
-            "input_cost": 0.0005,  # $0.50 / 1M tokens
-            "output_cost": 0.0015,  # $1.50 / 1M tokens
+            "max_tokens": 1050000,
+            "output_tokens": 128000,
+            "input_cost": 0.002,  # $2.00 / 1M tokens (doubles above 272K input tokens)
+            "output_cost": 0.01,  # $10.00 / 1M tokens (1.5x above 272K input tokens)
+            "capabilities": ["reasoning_effort"]
         },
     }
 
@@ -211,6 +77,11 @@ class ModelConfig:
     def get_max_tokens(cls, model: str) -> int:
         """Get the maximum token limit for a model."""
         return cls.get_model_info(model).get("max_tokens", 4000)
+
+    @classmethod
+    def get_output_tokens(cls, model: str) -> int:
+        """Get the per-response output token limit for a model."""
+        return cls.get_model_info(model).get("output_tokens", 4096)
 
     @classmethod
     def get_input_cost(cls, model: str) -> float:

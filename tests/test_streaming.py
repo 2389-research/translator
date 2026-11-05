@@ -39,7 +39,7 @@ class TestStreaming(unittest.TestCase):
 
         # Call translate_text with streaming
         translated_text, usage, error_msg = translator.translate_text(
-            "Hello world", "French", "o3", stream=True
+            "Hello world", "French", "gpt-6.1-sol", stream=True
         )
 
         # Check the results
@@ -47,7 +47,7 @@ class TestStreaming(unittest.TestCase):
         self.assertIsNotNone(usage)
         self.assertIsNone(error_msg)
         mock_client.chat.completions.create.assert_called_with(
-            model="o3",
+            model="gpt-6.1-sol",
             messages=[
                 {"role": "system", "content": unittest.mock.ANY},
                 {"role": "user", "content": unittest.mock.ANY},
@@ -110,7 +110,7 @@ class TestStreaming(unittest.TestCase):
 
         # Call translate_text with streaming and cancellation
         translated_text, usage, error_msg = translator.translate_text(
-            "Hello world", "French", "o3", stream=True, cancellation_handler=cancellation
+            "Hello world", "French", "gpt-6.1-sol", stream=True, cancellation_handler=cancellation
         )
 
         # Restore the original method
@@ -121,7 +121,7 @@ class TestStreaming(unittest.TestCase):
         self.assertIsNotNone(usage)
         self.assertIsNone(error_msg)
         mock_client.chat.completions.create.assert_called_with(
-            model="o3",
+            model="gpt-6.1-sol",
             messages=[
                 {"role": "system", "content": unittest.mock.ANY},
                 {"role": "user", "content": unittest.mock.ANY},

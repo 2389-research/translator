@@ -65,10 +65,7 @@ class OpenAIProvider(AIProvider):
                 "stream": stream
             }
 
-            # Add model-specific parameters
-            if actual_model != "o3":
-                params["temperature"] = 0.7
-
+            # No sampling parameters: reasoning models reject a non-default temperature
             if stream:
                 return self._handle_streaming_response(params, cancellation_handler, token_callback)
             else:
@@ -152,7 +149,7 @@ class AnthropicProvider(AIProvider):
             # Build API parameters for Anthropic
             params = {
                 "model": actual_model,
-                "max_tokens": 4096,  # Claude's output limit
+                "max_tokens": ModelConfig.get_output_tokens(actual_model),  # shared by thinking and the translation
                 "system": system_prompt,
                 "messages": [
                     {"role": "user", "content": f"Translate this text to {target_language}:\n\n{text}"}
@@ -180,6 +177,8 @@ class AnthropicProvider(AIProvider):
                         break
 
                     if chunk.type == 'content_block_delta':
+                        if chunk.delta.type != 'text_delta':
+                            continue  # thinking and signature deltas carry no translation text
                         content = chunk.delta.text
                         translated_text += content
                         if token_callback:
@@ -203,10 +202,21 @@ class AnthropicProvider(AIProvider):
             return None, {}, str(e)
 
     def _handle_non_streaming_response(self, params):
-        """Handle non-streaming Anthropic response."""
+        """Return the complete Anthropic response in one piece.
+
+        The SDK refuses non-streaming requests whose max_tokens could take longer
+        than ten minutes, so this streams under the hood and collects the final message.
+        """
         try:
-            response = self.client.messages.create(**params)
-            translated_text = response.content[0].text
+            with self.client.messages.stream(**params) as stream:
+                response = stream.get_final_message()
+
+            # Responses start with thinking blocks, so read by block type rather than position
+            translated_text = "".join(
+                block.text for block in response.content if block.type == "text"
+            )
+            if not translated_text:
+                return None, {}, f"No translation returned (stop_reason: {response.stop_reason})"
 
             usage_dict = {
                 'prompt_tokens': response.usage.input_tokens,

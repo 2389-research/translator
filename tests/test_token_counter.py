@@ -89,7 +89,7 @@ def test_check_token_limits():
     short_text = "This is a short test."
 
     # Test with different models
-    within_limits, token_count = TokenCounter.check_token_limits(short_text, "o3")
+    within_limits, token_count = TokenCounter.check_token_limits(short_text, "gpt-6.1-sol")
 
     # Assertions
     assert isinstance(within_limits, bool)

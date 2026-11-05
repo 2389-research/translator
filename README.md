@@ -103,8 +103,8 @@ echo "OPENAI_API_KEY=your_openai_api_key_here" > ~/.config/translator/.env
 You can add these options to your `.env` file:
 
 ```bash
-# Default model (optional, defaults to o3)
-DEFAULT_MODEL=o3
+# Default model (optional, defaults to gpt-6.1-sol)
+DEFAULT_MODEL=gpt-6.1-sol
 
 # Output directory for translated files (optional)
 OUTPUT_DIR=/path/to/output/directory
@@ -132,8 +132,9 @@ translator config
 # Translate to French with a custom output file
 translator README.md French -o translated_readme.md
 
-# Use a specific OpenAI model
-translator document.txt Japanese -m gpt-4o
+# Use a specific model (OpenAI or Anthropic)
+translator document.txt Japanese -m gpt-6-astra
+translator document.txt Japanese -m claude-opus-5-5
 
 # Skip the editing step for faster processing
 translator long_document.txt German --no-edit

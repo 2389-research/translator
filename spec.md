@@ -298,19 +298,17 @@ metadata, content = frontmatter_handler.extract_frontmatter(content)
 
 ### Supported Models
 #### OpenAI Models
-- **gpt-5, gpt-5-mini, gpt-5-nano** - Latest GPT-5 series with advanced reasoning
-- **o3, o3-mini, o4-mini** - Reasoning-focused models
-- **gpt-4o, gpt-4o-mini, gpt-4-turbo, gpt-4** - GPT-4 series
-- **gpt-4.1, gpt-4.1-mini, gpt-4.1-nano** - Extended context models
-- **gpt-3.5-turbo** - Legacy model
+- **gpt-6-astra** - GPT-6 Astra, the flagship ($10 / $50 per 1M tokens)
+- **gpt-6.1-sol** - GPT-6.1 Sol, close to Astra at a fifth of the price (default)
 
 #### Anthropic Models
-- **claude-opus-4.1** - Most capable model (default)
-- **claude-sonnet-4** - Balanced performance and cost
-- **claude-3.5-haiku** - Fast and economical
+- **claude-fable-5-1** - Most capable Claude model
+- **claude-opus-5-5** - Long-running agentic and knowledge work
+- **claude-sonnet-5-5** - Balanced speed and intelligence
+- **claude-haiku-5-5** - Fast and economical
 
 #### Model Selection
-- **Default:** claude-opus-4.1
+- **Default:** gpt-6.1-sol (override with `-m` or `DEFAULT_MODEL`)
 - **Prefix Support:** openai:model-name, anthropic:model-name
 - **Backward Compatibility:** Non-prefixed models auto-detect provider
 

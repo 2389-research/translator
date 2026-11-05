@@ -9,6 +9,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from translator.log_interpreter import LogInterpreter
+from translator.config import ModelConfig
 
 
 class TestLogInterpreter(unittest.TestCase):
@@ -99,7 +100,7 @@ class TestLogInterpreter(unittest.TestCase):
         # Verify the OpenAI API was called correctly
         self.mock_client.chat.completions.create.assert_called_once()
         call_args = self.mock_client.chat.completions.create.call_args[1]
-        self.assertEqual(call_args["model"], "o4-mini")
+        self.assertEqual(call_args["model"], ModelConfig.DEFAULT_MODEL)
         self.assertEqual(len(call_args["messages"]), 2)
 
         # Verify the narrative was generated

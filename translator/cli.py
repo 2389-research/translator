@@ -245,42 +245,35 @@ class StreamingTokenDisplay:
 class TranslatorCLI:
     """Command-line interface for the translator."""
 
-    @classmethod
-    def setup_openai_client(cls) -> openai.OpenAI:
-        """Set up and return an OpenAI client.
-        
-        Looks for the OpenAI API key in the following locations (in order of precedence):
+    @staticmethod
+    def load_config_env() -> None:
+        """Load settings from .env files without overriding exported variables.
+
+        Sources are read in order of precedence, and the first value found wins:
         1. Environment variables
         2. .env file in the current working directory
         3. .env file in ~/.translator/ directory
         4. .env file in ~/.config/translator/ directory
         """
-        # First, try loading from the current directory
         load_dotenv()
-        
-        # If no API key yet, try user config directories
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            # Try ~/.translator/.env
-            home_dir = os.path.expanduser("~")
-            translator_dir = os.path.join(home_dir, ".translator")
-            env_path = os.path.join(translator_dir, ".env")
-            
+        home_dir = os.path.expanduser("~")
+        xdg_config_home = os.environ.get("XDG_CONFIG_HOME", os.path.join(home_dir, ".config"))
+        for env_path in (
+            os.path.join(home_dir, ".translator", ".env"),
+            os.path.join(xdg_config_home, "translator", ".env"),
+        ):
             if os.path.exists(env_path):
                 load_dotenv(env_path)
-                api_key = os.getenv("OPENAI_API_KEY")
-            
-            # If still no API key, try XDG_CONFIG_HOME/translator/.env
-            if not api_key:
-                xdg_config_home = os.environ.get("XDG_CONFIG_HOME", os.path.join(home_dir, ".config"))
-                config_dir = os.path.join(xdg_config_home, "translator")
-                env_path = os.path.join(config_dir, ".env")
 
-                if os.path.exists(env_path):
-                    load_dotenv(env_path)
-                    api_key = os.getenv("OPENAI_API_KEY")
+    @staticmethod
+    def resolve_model(cli_model: Optional[str]) -> str:
+        """Pick the model: the -m flag, then DEFAULT_MODEL, then the built-in default."""
+        return cli_model or os.getenv("DEFAULT_MODEL") or ModelConfig.DEFAULT_MODEL
 
-        # Return OpenAI client if API key is found, otherwise return None
+    @classmethod
+    def setup_openai_client(cls) -> Optional[openai.OpenAI]:
+        """Set up and return an OpenAI client, or None when no OPENAI_API_KEY is configured."""
+        api_key = os.getenv("OPENAI_API_KEY")
         if api_key:
             return openai.OpenAI(api_key=api_key)
 
@@ -299,7 +292,7 @@ class TranslatorCLI:
 
         Returns None if no API key is found (Anthropic models will be unavailable).
         """
-        # API key should already be loaded by setup_openai_client
+        # The .env files were already loaded by load_config_env
         api_key = os.getenv("ANTHROPIC_API_KEY")
 
         if not api_key:
@@ -559,8 +552,8 @@ class TranslatorCLI:
         # OpenAI API Key (optional but recommended)
         console.print("\n[bold]API Keys Configuration[/]")
         console.print("You can configure one or both API providers:")
-        console.print("• OpenAI: For GPT models (gpt-4o, gpt-4o-mini, o3, etc.)")
-        console.print("• Anthropic: For Claude models (claude-3-haiku-20240307, claude-3-5-sonnet-20241022, etc.)")
+        console.print(f"• OpenAI: For GPT models ({', '.join(ModelConfig.get_models_by_provider('openai'))})")
+        console.print(f"• Anthropic: For Claude models ({', '.join(ModelConfig.get_models_by_provider('anthropic'))})")
 
         console.print("\n[bold]OpenAI API Key (recommended)[/]")
         openai_key = input("Enter your OpenAI API key (or press Enter to skip): ").strip()
@@ -579,14 +572,14 @@ class TranslatorCLI:
             return
         
         # Default model (optional)
-        console.print("\n[bold]Default Model (optional, default: gpt-4o-mini)[/]")
+        console.print(f"\n[bold]Default Model (optional, default: {ModelConfig.DEFAULT_MODEL})[/]")
         console.print("Available models: " + ", ".join(ModelConfig.MODELS.keys()))
-        default_model = input("Enter your preferred default model (or press Enter for gpt-4o-mini): ").strip()
+        default_model = input(f"Enter your preferred default model (or press Enter for {ModelConfig.DEFAULT_MODEL}): ").strip()
         if default_model:
             if default_model in ModelConfig.MODELS:
                 config["DEFAULT_MODEL"] = default_model
             else:
-                console.print(f"[yellow]Warning:[/] Unknown model '{default_model}'. Using o3.")
+                console.print(f"[yellow]Warning:[/] Unknown model '{default_model}'. Using {ModelConfig.DEFAULT_MODEL}.")
         
         # Write the configuration file
         try:
@@ -603,7 +596,7 @@ class TranslatorCLI:
 
                 # Add comments for documentation
                 if "DEFAULT_MODEL" not in config:
-                    f.write("\n\n# Default model (uncomment to change)\n# DEFAULT_MODEL=gpt-4o-mini\n")
+                    f.write(f"\n\n# Default model (uncomment to change)\n# DEFAULT_MODEL={ModelConfig.DEFAULT_MODEL}\n")
 
                 # Include comment about output directory but don't prompt for it
                 f.write("\n# Output directory (defaults to same location as input file)\n# OUTPUT_DIR=/path/to/output/directory\n")
@@ -649,7 +642,8 @@ class TranslatorCLI:
         parser.add_argument("language", nargs='?', help="Target language for translation")
         parser.add_argument("-o", "--output", help="Output file path (optional)")
         parser.add_argument(
-            "-m", "--model", default="o3", help="AI model to use (default: o3)"
+            "-m", "--model",
+            help=f"AI model to use (default: DEFAULT_MODEL from .env, else {ModelConfig.DEFAULT_MODEL})",
         )
         parser.add_argument(
             "--no-edit",
@@ -715,7 +709,7 @@ class TranslatorCLI:
         input_file = args.file
         target_language = args.language
         output_file = args.output
-        model = args.model
+        model = cls.resolve_model(args.model)
         skip_edit = args.no_edit
         do_critique = not args.no_critique  # Critique is enabled by default
         critique_loops = args.critique_loops if do_critique else 0
@@ -1543,7 +1537,7 @@ class TranslatorCLI:
         log_interpreter = LogInterpreter(client)
 
         # Generate the narrative (using non-streaming for this since it's less critical)
-        narrative = log_interpreter.generate_narrative(log_data, "o4-mini", stream=False)
+        narrative = log_interpreter.generate_narrative(log_data, stream=False)
 
         # Get the narrative filename - format: filename.languagecode.log
         base_parts = Path(output_path).stem.split(".")
@@ -1734,6 +1728,7 @@ class TranslatorCLI:
     def run(cls) -> None:
         """Run the translator command-line interface."""
         args = cls.parse_arguments()
+        cls.load_config_env()
 
         # Handle "config" command
         if hasattr(args, 'command') and args.command == 'config':
