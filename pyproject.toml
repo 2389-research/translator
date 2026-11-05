@@ -28,3 +28,7 @@ package = true
 
 [tool.uv.sources]
 swarm = { git = "https://github.com/openai/swarm.git" }
+
+[tool.ruff.lint]
+# The rule set this codebase is held to; newer ruff releases enable far more by default
+select = ["E4", "E7", "E9", "F"]
