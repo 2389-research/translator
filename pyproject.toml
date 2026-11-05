@@ -1,7 +1,7 @@
 [project]
 name = "translator"
-version = "0.4.1"
-description = "CLI tool to translate text files using OpenAI's API"
+version = "0.5.0"
+description = "CLI tool to translate text files using OpenAI or Anthropic models"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
