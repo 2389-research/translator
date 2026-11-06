@@ -64,6 +64,22 @@ class ModelConfig:
             "output_cost": 0.01,  # $10.00 / 1M tokens (1.5x above 272K input tokens)
             "capabilities": ["reasoning_effort"]
         },
+        "gpt-6.1-terra": {
+            "provider": "openai",
+            "max_tokens": 1050000,
+            "output_tokens": 128000,
+            "input_cost": 0.001,  # $1.00 / 1M tokens (doubles above 272K input tokens)
+            "output_cost": 0.005,  # $5.00 / 1M tokens (1.5x above 272K input tokens)
+            "capabilities": ["reasoning_effort"]
+        },
+        "gpt-6-luna": {
+            "provider": "openai",
+            "max_tokens": 1050000,
+            "output_tokens": 128000,
+            "input_cost": 0.0001,  # $0.10 / 1M tokens (doubles above 272K input tokens)
+            "output_cost": 0.0005,  # $0.50 / 1M tokens (1.5x above 272K input tokens)
+            "capabilities": ["reasoning_effort"]
+        },
     }
 
     @classmethod

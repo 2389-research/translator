@@ -300,6 +300,8 @@ metadata, content = frontmatter_handler.extract_frontmatter(content)
 #### OpenAI Models
 - **gpt-6-astra** - GPT-6 Astra, the flagship ($10 / $50 per 1M tokens)
 - **gpt-6.1-sol** - GPT-6.1 Sol, close to Astra at a fifth of the price (default)
+- **gpt-6.1-terra** - GPT-6.1 Terra, fast and efficient for writing and visual work ($1 / $5)
+- **gpt-6-luna** - GPT-6 Luna, the most efficient model for high-volume work ($0.10 / $0.50)
 
 #### Anthropic Models
 - **claude-fable-5-1** - Most capable Claude model
