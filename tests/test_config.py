@@ -22,8 +22,33 @@ def test_models_dict_structure():
 
 
 def test_openai_lineup():
-    """The OpenAI lineup is GPT-6 Astra and GPT-6.1 Sol."""
-    assert ModelConfig.get_models_by_provider("openai") == ["gpt-6-astra", "gpt-6.1-sol"]
+    """The OpenAI lineup is the current GPT-6 family from the public model catalog."""
+    assert ModelConfig.get_models_by_provider("openai") == [
+        "gpt-6-astra",
+        "gpt-6.1-sol",
+        "gpt-6.1-terra",
+        "gpt-6-luna",
+    ]
+
+
+def test_openai_models_match_published_specs():
+    """Limits and pricing match developers.openai.com/api/docs/models."""
+    # model: (context, max output, $/1M input, $/1M output)
+    expected = {
+        "gpt-6-astra": (1050000, 128000, 10.0, 50.0),
+        "gpt-6.1-sol": (1050000, 128000, 2.0, 10.0),
+        "gpt-6.1-terra": (1050000, 128000, 1.0, 5.0),
+        "gpt-6-luna": (1050000, 128000, 0.1, 0.5),
+    }
+
+    for model, (context, output, input_per_million, output_per_million) in expected.items():
+        info = ModelConfig.MODELS[model]
+        assert info["provider"] == "openai"
+        assert info["max_tokens"] == context
+        assert info["output_tokens"] == output
+        # Costs are stored per 1K tokens, the catalog publishes per 1M tokens
+        assert info["input_cost"] == input_per_million / 1000
+        assert info["output_cost"] == output_per_million / 1000
 
 
 def test_anthropic_lineup():
